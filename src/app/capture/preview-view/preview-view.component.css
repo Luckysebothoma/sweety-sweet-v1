@@ -1,0 +1,47 @@
+/* Set fixed width for the table and basic rows/cells */
+.mat-table {
+  width: 100%; /* Full width to adapt to container */
+  overflow-x: auto;
+  display: block;
+}
+
+.mat-table td, .mat-table tr {
+  min-width: 200px;
+}
+
+/* Improve cell padding and font size */
+.mat-cell, .mat-header-cell {
+  padding: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Specific column width control */
+.mat-column-name,
+.mat-column-age {
+  width: 100px;
+}
+
+/* Optional background utility class */
+.bak {
+  background-color: blue;
+}
+
+/* Scrollable checkbox list */
+.checkbox-container {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* Space between checkboxes */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Optional spacing for checkboxes */
+.checkbox-container mat-checkbox {
+  margin-right: 5px;
+}

@@ -1,0 +1,129 @@
+
+<div class="table-scroll-container mat-table-container">
+
+   
+  <mat-grid-list cols="1">
+    <mat-grid-tile>
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>📝 New SOD EOD</mat-card-title>
+        </mat-card-header>
+
+        <mat-card-content>
+          <button mat-raised-button color="primary" (click)="productService.sendDataSourceSodEod()">
+            📤 Send SOD EOD to Database
+          </button>
+
+          <ng-container *ngIf="productService.dataSourceSodEod.data.length > 0">
+            <table mat-table [dataSource]="productService.dataSourceSodEod" class="mat-elevation-z8 sod-eod-table">
+
+              <!-- 🖼 Image -->
+              <ng-container matColumnDef="productImage">
+                <th mat-header-cell *matHeaderCellDef>🖼</th>
+                <td mat-cell *matCellDef="let element">
+                  <img [src]="imageService.getImageUrl_nginx(element.productId)" alt="Product" class="product-img" />
+                </td>
+              </ng-container>
+
+              <!-- 🆔 ID -->
+              <ng-container matColumnDef="productId">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>🆔 ID</th>
+                <td mat-cell *matCellDef="let element"> {{ element.productId }} </td>
+              </ng-container>
+
+              <!-- 📦 Taken -->
+              <ng-container matColumnDef="itemsTaken">
+                <th mat-header-cell *matHeaderCellDef>📦 Taken</th>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="editedRow === element; else readonlyTaken">
+                    <input matInput [(ngModel)]="element.itemsTaken" type="number" min="0" class="edit-input" />
+                  </ng-container>
+                  <ng-template #readonlyTaken>{{ element.itemsTaken }}</ng-template>
+                </td>
+              </ng-container>
+
+              <!-- 📦 Remaining -->
+              <ng-container matColumnDef="itemsRemaining">
+                <th mat-header-cell *matHeaderCellDef>📦 Remaining</th>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="editedRow === element; else readonlyRemaining">
+                    <input matInput [(ngModel)]="element.itemsRemaining" type="number" min="0" class="edit-input" />
+                  </ng-container>
+                  <ng-template #readonlyRemaining>{{ element.itemsRemaining }}</ng-template>
+                </td>
+              </ng-container>
+
+<!-- 💰 Cost -->
+<ng-container matColumnDef="totalCost">
+  <th mat-header-cell *matHeaderCellDef>💰 Cost</th>
+  <td mat-cell *matCellDef="let element">
+    {{ computeCost(element) | number: '1.2-2' }}
+  </td>
+</ng-container>
+
+<!-- 💵 Revenue -->
+<ng-container matColumnDef="totalRevenue">
+  <th mat-header-cell *matHeaderCellDef>💵 Revenue</th>
+  <td mat-cell *matCellDef="let element">
+    {{ computeRevenue(element) | number: '1.2-2' }}
+  </td>
+</ng-container>
+
+<!-- 📈 Profit -->
+<ng-container matColumnDef="totalProfit">
+  <th mat-header-cell *matHeaderCellDef>📈 Profit</th>
+  <td mat-cell *matCellDef="let element">
+    {{ computeProfit(element) | number: '1.2-2' }}
+  </td>
+</ng-container> 
+
+              <!-- 🗓 Date -->
+              <ng-container matColumnDef="date">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Date 🗓</th>
+                <td mat-cell *matCellDef="let element">
+                  {{ element.date | date: 'shortDate' }}
+                </td>
+              </ng-container>
+
+              <!-- ❌ OOS -->
+              <ng-container matColumnDef="outOfStock">
+                <th mat-header-cell *matHeaderCellDef>❌ OOS</th>
+                <td mat-cell *matCellDef="let element"> 
+                  {{ element.outOfStock ? 'Yes' : 'No' }} 
+                </td>
+
+                
+              </ng-container>
+
+              <!-- ⚙️ Actions -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef>⚙️</th>
+                <td mat-cell *matCellDef="let element">
+                  <ng-container *ngIf="editedRow !== element">
+                    <button mat-button color="accent" (click)="editRow(element)">Edit</button>
+                  </ng-container>
+                  <ng-container *ngIf="editedRow === element">
+                    <button mat-icon-button color="primary" (click)="saveRow(element)">
+                      <mat-icon>check</mat-icon>
+                    </button>
+                    <button mat-icon-button color="warn" (click)="cancelEdit()">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </ng-container>
+                </td>
+              </ng-container>
+
+              <!-- Row Definitions -->
+              <tr mat-header-row *matHeaderRowDef="displayedColumnsSodEod"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumnsSodEod;"></tr>
+            </table>
+          </ng-container>
+
+          <div *ngIf="productService.dataSourceSodEod.data.length === 0" class="no-data">
+            🚫 No SOD EOD data available
+          </div>
+        </mat-card-content>
+      </mat-card>
+    </mat-grid-tile>
+  </mat-grid-list>
+</div>

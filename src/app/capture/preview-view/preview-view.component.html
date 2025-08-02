@@ -1,0 +1,58 @@
+
+
+<!-- <div *ngIf="productService.previewSOD_EOD">
+<mat-spinner *ngIf="productService.checkboxSpinner"> </mat-spinner>  
+SOD_EOD
+
+<table> 
+    <thead>
+      <tr>
+          <td>
+            <input (click)="productService.outOfStockOnly()" 
+              type="button" value="Out Of Stock Only - Prev" > 
+          </td> 
+          
+          <td>
+            <input (click)="productService.AvailableStockOnly()" 
+              type="button" value="AvaialableStock - Prev" >
+          </td> 
+          <td> 
+            <input (click)="productService.ShowUnCaptured()"
+              type="button" value=" Show unCaptured - Prev">
+          </td> 
+          
+          <td>
+            <input (click)="productService.ShowAll()"
+              type="button" value=" Show All - Prev" >
+          </td>
+
+      </tr> 
+      <tr >
+          <td colspan="4"> 
+              <input (click)="productService.clearMatTableSodEod()" 
+                type="button" value="Clear Mat Table Data-Prev" >
+          </td>  
+      </tr>
+    </thead>
+</table>
+<mat-checkbox 
+
+    *ngFor="let product of productService.productListToShowOnCheckBox; 
+            let i=index" (change)="productService.updateSelectedProducts($event, product, i ,'SodEod')">
+            {{i+1}}.{{product.productName }}
+</mat-checkbox>
+
+</div>
+
+<div *ngIf="productService.previewNewStock">
+
+New Stock - Diplayed when CHecking Items
+<input (click)="productService.populateToMatTable()" 
+type="button" value="Populate Items to Table" > 
+<div class="mat-table-container">
+
+  
+</div>
+
+
+--> 

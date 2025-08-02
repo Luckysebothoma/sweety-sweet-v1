@@ -1,0 +1,378 @@
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpEvent, HttpHeaders, HttpParams } from '@angular/common/http';
+import { AppMetrics, AvailableItems, PriceTracing, ProductItemPricing, ProductList, ProductListStock, ProductPricing, YummyList } from '../models/candy-list';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { environment } from 'src/environments/environment';
+import { dailyOpeartions } from '../models/financial-stock-interface';
+    import { forkJoin } from 'rxjs';
+import { tap } from 'rxjs/operators';
+    
+
+@Injectable({
+  providedIn: 'root'
+})
+export class HttpClientService {
+
+  private readonly baseUrl = environment.nodejs.full_api_path;
+  private stateCache: Record<string, BehaviorSubject<any>> = {};
+
+
+  apiUrl = environment.redisPostgres;
+  private readonly API_URL = environment.apiUrl +"/images/temp";
+  private nodejs_apiUrl = 'http://localhost:8080/api/stock/process'; // or your public tunnel URL
+  
+
+  constructor(private http : HttpClient) { }
+
+
+
+  updateProduct_YummyList_Table(
+  productList: ProductList[],
+  pricingList: ProductPricing[],
+  availableItems: AvailableItems[],
+  priceTracingList: PriceTracing[]
+): Observable<any> {
+
+  const payload = {
+    productList,
+    pricingList,
+    availableItems,
+    priceTracingList
+  };
+
+  
+  const fillUrl = environment.nodejs.full_api_path + "/updateProducts_Batch";
+ 
+  return this.http.post(fillUrl, payload);
+}
+
+
+
+async sendImageToEndpoint(productId: number): Promise<void> {
+  const imageUrl = `https://expose_images.justdo-it.uk/images/Product_${productId}.jpg`;
+  console.log(`📤 Attempting to send image for productId=${productId} from URL: ${imageUrl}`);
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Image fetch failed: ${response.status} ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const base64 = await this.convertBlobToBase64(blob);
+
+    const formData = new FormData();
+    formData.append('blob', blob, `${productId}.jpg`);
+    formData.append('base64', base64);
+    formData.append('key', `product:${productId}`);
+
+    this.sendImageToRedis(formData).subscribe({
+      next: (res) => console.log('✅ Image sent successfully:', res),
+      error: (err) => console.error('❌ Redis send error:', err),
+    });
+
+  } catch (err) {
+    console.error(`❌ Fetch or conversion error for productId=${productId}:`, err);
+  }
+}
+
+  sendImageToRedis(formData: FormData){
+    console.log(Date.now() +"sendImageToRedis ")
+    
+        return this.http.post(environment.apiUrl+'/sortedAsRedisKey', formData);
+  }
+
+  private convertBlobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(',')[1]; // Remove data URI prefix
+        resolve(base64String);
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
+ /**
+   * Upload image to Redis (temporary)
+   */
+  uploadTempImage(file: File, imageDetails:ProductList): Observable<any> {
+
+    console.log("Uploading image with details: ", imageDetails);
+    const formData = new FormData();
+    
+    formData.append('file', file); // Changed 'image' to 'file'
+    const headers = new HttpHeaders({
+      // Example: add custom headers if needed
+      // 'Authorization': 'Bearer your-token'
+    });
+//    return this.http.post(`${this.API_URL}`, formData, { headers });
+
+const fillUrl = environment.apiUrl + "/images/temp";
+return this.http.post(`${fillUrl}`, formData);
+  }
+  // Function to send GET request to fetch temp key
+  getTempKey(): Observable<{ key: string }> {
+    console.log("Generating Temp Key")
+    return this.http.get<{ key: string }>(environment.apiUrl + '/images/temp-key');
+  }
+   /**
+   * Retrieve temfvporary image by Redis key
+   */
+  getTempImageByKey(key: string): Observable<Blob> {
+  const encodedKey = encodeURIComponent(key); // Encode special characters like ":"
+  return this.http.get(`${environment.apiUrl}/temp?key=${encodedKey}`, {
+    responseType: 'blob'
+  });
+}
+
+    /**
+   * Upload image
+   */
+  uploadImage(file: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('image', file);
+    return this.http.post(`${this.API_URL}`, formData);
+  }
+  /**
+   * Get image metadata or from Redis cache
+   */
+  getImageById(id: number): Observable<any> {
+    return this.http.get(`${this.API_URL}/${id}`);
+  }
+
+    /**
+   * Delete image
+   */
+  deleteImage(id: number): Observable<any> {
+    return this.http.delete(`${environment.apiUrl}/${id}`);
+  }
+
+  /**
+   * Update image by re-uploading
+   */
+  updateImage(id: number, newFile: File): Observable<any> {
+    const formData = new FormData();
+    formData.append('image', newFile);
+    return this.http.put(`${environment.apiUrl}/${id}`, formData);
+  }
+
+  getUnCapturedProducts(): Observable<ProductListStock[]>{
+    const fullApiUrl = this.apiUrl + "/getUnCapturedProducts";
+
+    return this.http.get<ProductListStock[]> (fullApiUrl) ;
+
+  }
+
+  getOutOfStockOnly(): Observable<ProductListStock[]>{
+    const fullApiUrl = this.apiUrl + "/getOutOfStockOnly";
+
+    return this.http.get<ProductListStock[]> (fullApiUrl) ;
+
+  }
+  
+  getAvailableStockOnly(): Observable<ProductListStock[]>{
+
+    const fullApiUrl = this.apiUrl + "/getAvailableStockOnly";
+
+    return this.http.get<ProductListStock[]> (fullApiUrl) ;
+
+  }
+
+  setUnCapturedProducts(stock : ProductListStock): Observable<ProductListStock>{
+    const fullApiUrl = this.apiUrl + "/setUnCapturedProducts";
+
+    return this.http.post<ProductListStock> (fullApiUrl, stock) ;
+
+  }
+
+  setOutOfStockOnly(stock : ProductListStock): Observable<ProductListStock>{
+    const fullApiUrl = this.apiUrl + "/setOutOfStockOnly";
+
+    return this.http.post<ProductListStock> (fullApiUrl, stock);
+
+  }
+  
+  setAvailableStockOnly(stock : ProductListStock): Observable<ProductListStock>{
+
+    const fullApiUrl = this.apiUrl + "/setAvailableStockOnly";
+
+    return this.http.post<ProductListStock> (fullApiUrl, stock) ;
+
+  }
+
+  saveUpdatedProduct_http(productList: ProductList, yummylist:YummyList, productPricing: ProductPricing){
+    console.log("product getting reday to the updated in httpClientServe : saveUpdatedProduct_http")
+
+  
+  }
+
+
+  bulk_stockProduct(path:string, result:any){
+
+forkJoin([
+
+//  put<Product>('products', product, this.productKey);
+  this.put<dailyOpeartions>("dailyOps",result.dailyOps,"dailyOpeartions"),
+  this.put<ProductItemPricing>("productPricing", result.productPricing, "productPricing"),
+  this.put<AppMetrics>("logs", result.appLogs, 'logs'),
+  this.put<AvailableItems>("availableItems", result.availableItems, 'availableItems'),
+  this.put<PriceTracing>("priceTracings", result.priceTracings, 'priceTracings')
+
+
+
+]).subscribe({
+  next: ([dailyOpsRes, productPricingRes, logsRes, availableItemsRes, priceTracingRes]) => {
+    console.log("📦 All APIs succeeded");
+    console.log({ dailyOpsRes, productPricingRes, logsRes, availableItemsRes, priceTracingRes });
+  },
+  error: (err) => {
+    console.error("❌ One of the API calls failed:", err);
+  }
+});
+
+  }
+
+
+/*
+  // =================== 🔁 Generic GET ===================
+  get<T>(endpoint: string, params?: any): Observable<T> {
+    const httpParams = new HttpParams({ fromObject: params || {} });
+    return this.http.get<T>(`${this.baseUrl}/${endpoint}`, { params: httpParams });
+  }
+
+  // =================== 📩 Generic POST ===================
+  post<T>(endpoint: string, data: any): Observable<T> {
+    return this.http.post<T>(`${this.baseUrl}/${endpoint}`, data, {
+      headers: this.getJsonHeaders()
+    });
+  }
+
+  // =================== ♻️ PUT ===================
+  put<T>(endpoint: string, data: any): Observable<T> {
+    return this.http.put<T>(`${this.baseUrl}/${endpoint}`, data, {
+      headers: this.getJsonHeaders()
+    });
+  }
+
+  // =================== ❌ DELETE ===================
+  delete<T>(endpoint: string, id: number | string): Observable<T> {
+    return this.http.delete<T>(`${this.baseUrl}/${endpoint}/${id}`);
+  }
+
+*/
+
+
+
+  // =================== 🔐 JSON Headers ===================
+  private getJsonHeaders(): HttpHeaders {
+    return new HttpHeaders({
+      'Content-Type': 'application/json',
+      // 'Authorization': `Bearer ${yourToken}` // Optional Auth token
+    });
+  }
+  // 🧠 Get BehaviorSubject or initialize
+  private getSubject<T>(key: string): BehaviorSubject<T> {
+    if (!this.stateCache[key]) {
+      this.stateCache[key] = new BehaviorSubject<T>(null as any);
+    }
+    return this.stateCache[key] as BehaviorSubject<T>;
+  }
+
+  // =================== 🔁 Generic GET with optional cache ===================
+  get<T>(endpoint: string, params?: any, cacheKey?: string): Observable<T> {
+    const httpParams = new HttpParams({ fromObject: params || {} });
+
+    const obs$ = this.http.get<T>(`${this.baseUrl}/${endpoint}`, { params: httpParams });
+
+    if (cacheKey) {
+      return obs$.pipe(
+        tap(res => {
+          console.log(`[${new Date().toLocaleTimeString()}] [CACHE SET] ${cacheKey}`, res);
+          this.getSubject<T>(cacheKey).next(res);
+        })
+      );
+    }
+
+    return obs$;
+  }
+
+  // =================== 📩 Generic POST with optional cache update ===================
+  post<T>(endpoint: string, data: any, cacheKey?: string): Observable<T> {
+    const obs$ = this.http.post<T>(`${this.baseUrl}/${endpoint}`, data, {
+      headers: this.getJsonHeaders()
+    });
+
+    if (cacheKey) {
+      return obs$.pipe(
+        tap(res => {
+          const subject = this.getSubject<T[]>(cacheKey);
+          const current = subject.getValue() || [];
+          subject.next([...current, res]);
+          console.log(`[${new Date().toLocaleTimeString()}] [CACHE ADD] ${cacheKey}`, res);
+        })
+      );
+    }
+
+    return obs$;
+  }
+
+  // =================== ♻️ PUT with cache update ===================
+  put<T>(endpoint: string, data: T, cacheKey?: string): Observable<T> {
+    const obs$ = this.http.put<T>(`${this.baseUrl}/${endpoint}`, data, {
+      headers: this.getJsonHeaders()
+    });
+
+    if (cacheKey) {
+      return obs$.pipe(
+        tap(res => {
+          const subject = this.getSubject<T[]>(cacheKey);
+          const current = subject.getValue() || [];
+          subject.next([...current, res]);
+          console.log(`[${new Date().toLocaleTimeString()}] [CACHE ADD] ${cacheKey}`, res);
+        })
+      );
+    }
+
+
+    return obs$;
+  }
+
+  // =================== ❌ DELETE with cache update ===================
+  delete<T>(endpoint: string, id: number | string, cacheKey?: string): Observable<T> {
+    const obs$ = this.http.delete<T>(`${this.baseUrl}/${endpoint}/${id}`);
+
+    if (cacheKey) {
+      return obs$.pipe(
+        tap(() => {
+          const subject = this.getSubject<any[]>(cacheKey);
+          const current = subject.getValue() || [];
+          const updated = current.filter(item => item.id !== id);
+          subject.next(updated);
+          console.log(`[${new Date().toLocaleTimeString()}] [CACHE DELETE] ${cacheKey}`, id);
+        })
+      );
+    }
+
+    return obs$;
+  }
+
+  // =================== 🧾 Accessor for components to subscribe ===================
+  getState<T>(key: string): BehaviorSubject<T> {
+    return this.getSubject<T>(key);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+}

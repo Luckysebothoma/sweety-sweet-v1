@@ -1,0 +1,71 @@
+<div class="col-12 col-sm-6 col-lg-4">
+
+  <!-- Loader -->
+  <div *ngIf="loading_bounce">
+    <app-product-loader></app-product-loader>
+  </div>
+
+  <!-- Main Content -->
+  <div *ngIf="!loading_bounce">
+
+    <!-- Heading -->
+    <h2 class="section-title">Our Latest Collection – 3 June 25</h2>
+
+    <!-- Filter and Sort Controls -->
+    <div class="controls">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search</mat-label>
+        <input matInput (keyup)="applyFilter($event)" placeholder="Search products">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="sort-field">
+        <mat-label>Sort</mat-label>
+        <mat-select (selectionChange)="sortProducts($event.value)">
+          <mat-option value="priceLowHigh">Price: Low to High</mat-option>
+          <mat-option value="priceHighLow">Price: High to Low</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <div class="content-wrapper">
+
+      <!-- Side Left (Optional) 
+      <aside class="side-panel">Side Left</aside> 
+      -->
+      
+
+      <!-- Main Product Grid -->
+      <section class="product-section">
+<div class="product-grid" *ngIf="filteredProducts && filteredProducts.length > 0">
+
+          <mat-card *ngFor="let product of filteredProducts" class="product-card">
+            <mat-card-header>
+              <mat-card-title>{{ product.productId }}. {{ product.productName }}</mat-card-title>
+              <mat-card-subtitle>{{ product.productFlavor }} - {{ product.productPrice | currency:'ZAR' }}</mat-card-subtitle>
+            </mat-card-header>
+            
+              <img
+                [src]="imageService.getImageUrl_nginx(product.productId)"
+                [alt]="product.productName"
+              />  
+          </mat-card>
+
+        </div>
+
+        <!-- No Data -->
+        <mat-card *ngIf="filteredProducts?.length === 0" class="no-data-card">
+          <mat-card-content>
+            <p>No products available.</p>
+          </mat-card-content>
+        </mat-card>
+      </section>
+
+      <!-- Side Right (Optional) 
+       <aside class="side-panel">Side Right</aside>
+       -->
+      
+    </div>
+
+  </div>
+
+</div>

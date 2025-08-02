@@ -1,0 +1,27 @@
+FROM node:20-alpine
+
+# Install system dependencies for file watching
+RUN apk add --no-cache inotify-tools
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Install Angular CLI
+#RUN npm install -g @angular/cli
+
+#RUN npm install @angular/cli
+
+
+# Avoid using audit/fund in production Docker images
+#RUN npm install
+#RUN npm audit fix --force
+
+# Copy rest of the application (optional in dev, bind mount preferred)
+#COPY . .
+ 
+# Expose Angular dev port
+EXPOSE 4200
+ 
+# Start Angular CLI dev server
+#CMD ["ng", "serve", "--host", "0.0.0.0", "--poll", "2000"]
+CMD ["npm", "run", "https"]

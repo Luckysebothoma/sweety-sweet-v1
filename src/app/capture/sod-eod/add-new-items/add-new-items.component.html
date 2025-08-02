@@ -1,0 +1,66 @@
+
+<form (submit)="sod_eodSubmitted()"> 
+
+
+  
+      <table> 
+            <thead> 
+              <td> 
+                  <h1> Adding New - SOD_EOD- Something </h1>
+              </td>
+            </thead>
+        <tr>
+            <td>
+              <div>
+                <label for="date">Date:</label>
+                <input type="date" id="date" name="sod_eod_date" (ngModelChange)="onDateSelected($event)"  [(ngModel)]="sod_eod_date">
+              </div>
+            </td>
+        </tr>
+
+          <tr>
+            <td>
+              <div>
+                <mat-form-field>
+                  <mat-label>Select a category</mat-label>
+
+                  <mat-select name="selectedCategoryId" [(ngModel)]="selectedCategoryId">
+                    <mat-option *ngFor="let productlist of productList" [value]="productlist.productId">
+                      {{ productlist.productName }} - {{productlist.productFlavor}}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </td>
+        </tr>        
+
+        <tr>
+          <td>
+            <div>
+              <label for="prodQty">items Taken:</label>
+              <input type="number" id="itemsTaken" name="itemsTaken" [(ngModel)]="itemsTaken">
+            </div>
+          </td>
+      </tr>  
+
+
+          <tr>
+            <td>
+              <div>
+                <label for="prodPrice">Items Remaining:</label>
+                <input type="number" id="itemsRemaning" name="itemsRemaning" [(ngModel)]="itemsRemaning">
+              </div>
+            </td>
+        </tr>  
+
+      <tr>
+        <td>
+          <input type="submit" placeholder="Submit Stockies">
+        </td>
+    </tr> 
+
+
+      </table>
+
+
+    </form>

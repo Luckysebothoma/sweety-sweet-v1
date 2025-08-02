@@ -1,0 +1,51 @@
+  <div class="table-scroll-container mat-table-container">
+
+    
+<mat-card-header>
+    <mat-card-title>Available ItemS</mat-card-title>
+    
+     <!-- Paginator -->
+      <mat-paginator #paginatorAvailableItems [pageSizeOptions]="[3, 7, 10, 15]" showFirstLastButtons>
+
+      </mat-paginator>
+      <button mat-icon-button color="primary" (click)="loadTableData()">
+  <mat-icon>refresh</mat-icon>
+</button>
+    </mat-card-header>
+
+<ng-container *ngIf="dataSourceAvailableItems.data.length > 0">
+    <table mat-table [dataSource]="dataSourceAvailableItems" class="mat-elevation-z8">
+      <!-- Product ID Column -->
+
+    <ng-container matColumnDef="productId">
+      <mat-header-cell *matHeaderCellDef> Product ID </mat-header-cell>
+      <mat-cell *matCellDef="let element">
+        {{ element.productId }}
+        <img [src]="imageService.getImageUrl_nginx(element.productId)" style="max-width: 100px; margin-left: 10px;" alt="Product image">
+      </mat-cell>
+    </ng-container> 
+
+      <!-- Items Remaining Column -->
+      <ng-container matColumnDef="itemsRemaining">
+        <th mat-header-cell *matHeaderCellDef> Items Remaining </th>
+        <td mat-cell *matCellDef="let element"> {{element.itemsRemaining}} </td>
+      </ng-container>
+
+      <!-- Last Updated Column -->
+      <ng-container matColumnDef="lastUpdated">
+        <th mat-header-cell *matHeaderCellDef> Last Updated </th>
+        <td mat-cell *matCellDef="let element"> {{element.lastUpdated}} </td>
+      </ng-container>
+
+      <!-- Table Rows -->
+      <tr mat-header-row *matHeaderRowDef="displayedColumnsAvailableItems"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumnsAvailableItems;"
+      [ngClass]="isOutOfStock(row)" 
+      ></tr>
+    </table>
+
+    </ng-container>
+  <div *ngIf="dataSourceAvailableItems.data.length === 0" class="no-data">
+    No data available
+  </div>
+</div>

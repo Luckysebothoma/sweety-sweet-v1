@@ -1,0 +1,36 @@
+<div class="">
+<h2 class="gallery-title">🖼️ Image Gallery</h2>
+
+<div *ngIf="!imageService.imageSrc" class="no-images">
+  🚫 No images found.
+</div>
+
+<div class="gallery-grid" *ngIf="imageService.imageSrc">
+  <div *ngFor="let key of imageService.imageKeys" class="gallery-item">
+    <div class="image-wrapper">
+      <img 
+        [src]="imageService.imageSrc"
+        [alt]="key"
+        (error)="imageService.handleImageError($event)"
+        class="gallery-image"
+      />
+    </div>
+    <p class="image-label">{{ key }}</p>
+  </div>
+</div>
+
+
+<div class="image-gallery">
+  <ng-container *ngIf="imageService.imagesToPrev.length > 0">
+    <div class="image-card" *ngFor="let productId of imageService.imagesToPrev">
+      <img
+        [src]="imageService.getImageUrl_nginx(productId)"
+        [alt]="'Product ' + productId"
+        (error)="imageService.onImageError($event, productId)"
+      />
+      <div class="caption">Product ID: {{ productId }}</div>
+    </div>
+  </ng-container>
+</div>
+
+<img *ngIf="imageService.imageSrc" [src]="imageService.imageSrc" alt="Product Image">

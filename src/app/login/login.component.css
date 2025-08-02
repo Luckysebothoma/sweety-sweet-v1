@@ -1,0 +1,45 @@
+.image-upload-container {
+    max-width: 800px;
+    margin: 20px auto;
+  }
+  
+  .file-selection {
+    margin-bottom: 20px;
+  }
+  
+  .file-selection button {
+    margin-left: 10px;
+    padding: 5px 10px;
+  }
+  
+  .image-preview {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+  
+  .preview-container {
+    text-align: center;
+    margin: 15px 0;
+  }
+  
+  .preview-container img {
+    max-width: 100%;
+    max-height: 300px;
+    border: 1px solid #eee;
+  }
+  
+  .file-details {
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  
+  .message {
+    padding: 10px;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    margin-top: 10px;
+  }
+  

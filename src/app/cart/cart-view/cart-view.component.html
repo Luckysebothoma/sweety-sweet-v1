@@ -1,0 +1,45 @@
+<div class="container-sm">
+   
+
+    <div *ngIf="(loader_status)" >
+    
+    	<div>
+            <iframe src="https://nginx_acer.justdo-it.uk/gif/Loading_bouncing.gif" width="50%" height="50%" frameborder="0"></iframe>
+        </div>
+    </div>
+
+    <div *ngIf="(!(loader_status))">
+        <h1>Your cart</h1>
+    <mat-card>
+        <mat-list>
+            <mat-list-item *ngFor="let item of cartItems; index as i" #tableRow >
+                
+               
+                <span matListItemTitle> {{item.productName}} - {{item.productFlavor}} </span>
+                <span matListItemLine>{{item.productPrice | currency:'ZAR'}}</span>
+
+                <button mat-raised-button color="accent" (click)="removeRow(i, item.productId)"> Remove </button>
+
+            </mat-list-item>
+
+            <mat-list-item>
+                <span class="price" matListItemTitle>Total (USD)</span>
+                <span class="price" matListItemLine>{{totalPrice | currency:'ZAR'}}</span>
+            </mat-list-item>
+
+            <mat-list-item class="text-right">
+                <button mat-flat-button (click)="clearCart()">Clear</button>
+            </mat-list-item>
+
+            <mat-list-item class="text-right">
+                <button mat-raised-button color="accent" (click)="checkout()" >Checkout</button>
+            </mat-list-item>
+            <mat-list-item class="text-right">
+                <button mat-raised-button color="accent" (click)="showCalender()" >showCalender</button>
+            </mat-list-item>
+
+
+        </mat-list>
+    </mat-card>
+    </div>
+</div>

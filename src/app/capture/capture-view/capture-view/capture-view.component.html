@@ -1,0 +1,18 @@
+
+<div>
+  <div>
+      <h1> Capture Product Service </h1>
+  </div>
+  <div *ngIf="(loaderBounceService.loading_bounce)" >  
+    <div>
+        <app-loader-bounce></app-loader-bounce>
+    </div>
+  </div>
+
+    <div *ngIf="!(loaderBounceService.loading_bounce)">
+      <app-controls></app-controls>
+      
+    </div>
+
+</div>
+

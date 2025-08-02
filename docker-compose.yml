@@ -1,0 +1,68 @@
+networks:
+  sweety-sweet-network-bridge:
+    driver: bridge
+    external: true
+    internal: false
+  sweety-sweet-tunnel:
+    driver: bridge
+    external: true
+    internal: false
+  node-exporter:
+    driver: bridge
+    external: true
+    internal: false
+
+volumes:
+  certs:
+    external: true
+
+services: 
+  sweety-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "4200:80"
+    container_name: sweety-app
+    restart: unless-stopped
+#    command: npm start
+#    command: ng serve --host 0.0.0.0 --poll 2000
+    environment:
+      - TZ=Africa/Johannesburg
+    networks:
+      - sweety-sweet-network-bridge
+      - sweety-sweet-tunnel
+      - node-exporter
+    volumes:
+      - .:/usr/src/app
+      - /app/node_modules
+#      - /certs/crt.pem:/certs/cert.crt
+      - certs:/certs
+
+#      - /usr/src/app/node_modules  # prevents overwriting node_modules
+
+
+  sweety-app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "4210:4200"
+    container_name: sweety-app-dev
+    restart: unless-stopped
+#    command: npm start
+#    command: ng serve --host 0.0.0.0 --poll 2000
+    environment:
+      - TZ=Africa/Johannesburg
+    networks:
+      - sweety-sweet-network-bridge
+      - sweety-sweet-tunnel
+      - node-exporter
+    volumes:
+      - .:/usr/src/app
+      - /app/node_modules
+#      - /certs/crt.pem:/certs/cert.crt
+      - certs:/certs
+
+#      - /usr/src/app/node_modules  # prevents overwriting node_modules
+

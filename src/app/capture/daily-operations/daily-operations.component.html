@@ -1,0 +1,32 @@
+<!-- Daily Operation Header -->
+<h1>Daily Operation</h1>
+
+<!-- Load Data Button -->
+<input [disabled]="!productService.loadDataButtonState" type="button" (click)="loadData()" value="Load Data" name="Load Data" placeholder="Load Data" /> 
+
+
+<mat-paginator
+#paginator
+[pageSizeOptions]="captureService.pageSizes"
+showFirstLastButtons
+></mat-paginator>
+
+<!-- Example Container with Mat Grid List -->
+<div class=" mat-elevation-z8">
+  <mat-grid-list cols="1">
+
+    
+  <app-product-list-table> </app-product-list-table>
+
+  <app-available-items-list-table> </app-available-items-list-table>
+
+  <app-sod-eod-report></app-sod-eod-report>
+   
+  <app-estimates-report></app-estimates-report>
+  
+
+
+
+  </mat-grid-list>
+
+</div>

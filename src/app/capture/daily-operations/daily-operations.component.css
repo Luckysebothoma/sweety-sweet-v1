@@ -1,0 +1,51 @@
+/* Enable horizontal scrolling on small screens */
+.mat-table {
+  overflow-x: auto;
+  display: block;
+  width: 100%;
+}
+
+/* Shared cell styling */
+.mat-cell, .mat-header-cell {
+  display: table-cell;
+  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  line-break: auto;
+  word-wrap: normal;
+  width: 100%;
+  font-size: 14px;
+}
+
+/* Table rows */
+.mat-row, .mat-header-row {
+  display: table-row;
+}
+
+/* Scrollable table wrapper */
+.table-responsive {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+/* Row color indicators based on content */
+.low-amount,
+.low {
+  background-color: #ffebee; /* Soft red for warnings */
+}
+
+.middle {
+  background-color: #fff9c4; /* Soft yellow */
+}
+
+.full {
+  background-color: #e8f5e9; /* Soft green */
+}
+
+.invalid {
+  background-color: #cfd8dc; /* Muted gray-blue */
+}

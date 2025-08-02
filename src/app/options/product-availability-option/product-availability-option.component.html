@@ -1,0 +1,83 @@
+<h1> Available Products </h1>
+
+<div *ngIf="captureService.sod_eod_state">
+
+  <ng-container *ngTemplateOutlet="sodEodProductAvailability">
+
+  </ng-container>
+
+</div>
+
+<div *ngIf="captureService.stockItemsState">
+
+  <ng-container *ngTemplateOutlet="stockProductAvailability">
+    
+  </ng-container>
+
+</div>
+
+
+<ng-template #sodEodProductAvailability>
+
+  <!-- Button Group -->
+<div class="button-group">
+  <button mat-raised-button color="accent" (click)="AvailableStockOnly()">
+    Show AvailableStock
+  </button>
+
+</div>
+
+</ng-template>
+
+<ng-template #stockProductAvailability>
+  <!-- Button Group -->
+<div class="button-group">
+  <button mat-raised-button color="primary" (click)="outOfStockOnly()">
+    Dev_Out Of Stock Only
+  </button>
+  <button mat-raised-button color="accent" (click)="AvailableStockOnly()">
+    Dev_AvailableStock
+  </button>
+  <button mat-raised-button color="warn" (click)="ShowUnCaptured()">
+    Dev_Show UnCaptured
+  </button>
+  <button mat-raised-button (click)="ShowAll()">
+    Dev_Show All
+  </button> 
+ 
+</div>
+</ng-template>
+
+<!--
+<table> 
+    <thead>
+      <tr>
+          <td>
+            <input (click)="outOfStockOnly()"
+                  type="button" value="Dev_Out Of Stock Only" > 
+                </td> 
+                
+                <td>
+                  <input (click)="AvailableStockOnly()"
+                    type="button" value="Dev_AvaialableStock" > 
+                </td>
+                
+                <td> 
+                  <input (click)="ShowUnCaptured()" 
+                    type="button" value="Dev_Show unCaptured" >
+                  </td> 
+                  
+                <td> <input (click)="ShowAll()"
+                    type="button" value="Dev_Show All" >
+                </td>
+        </tr> 
+      <tr >
+          <td colspan="5"> 
+              <input (click)="clearMatTableSodEod()" 
+                type="button" 
+                value="Clear Mat Table Data " >
+          </td>  
+      </tr>
+    </thead>
+</table>
+-->

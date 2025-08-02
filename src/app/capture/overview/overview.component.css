@@ -1,0 +1,4 @@
+.table-container {
+    height: 300px; /* Set the desired height for the container */
+    overflow: auto; /* Add a scrollbar when content exceeds the container height */
+  }

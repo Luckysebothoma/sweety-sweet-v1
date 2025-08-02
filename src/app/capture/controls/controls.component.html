@@ -1,0 +1,274 @@
+<mat-card>
+  <mat-card-header>
+    <h3>Moderate Tab Animation</h3>
+    <button mat-buttun > View Cart</button> 
+    <button mat-buttun > View Product</button>
+
+    
+  </mat-card-header>
+</mat-card>
+
+<mat-tab-group
+  animationDuration="300ms"
+  (selectedIndexChange)="matTableService.onTabChangeIndex($event)"
+  (selectedTabChange)="matTableService.onTabChange($event)"
+  (focusChange)="matTableService.onFocusChange($event)"
+>
+
+
+</mat-tab-group>
+
+
+<mat-tab-group
+  animationDuration="300ms"
+  (selectedIndexChange)="matTableService.onTabChangeIndex($event)"
+  (selectedTabChange)="matTableService.onTabChange($event)"
+  (focusChange)="matTableService.onFocusChange($event)"
+>
+  <!-- Add New Tab -->
+  <mat-tab label="Add New" (opened)="matTableService.onOpened()" (closed)="matTableService.onClosed()">
+    <ng-container *ngTemplateOutlet="productSelector; context: { name: 'products_delete' }"></ng-container>
+
+    <ng-container *ngTemplateOutlet="newTab" ></ng-container>
+    <ng-container *ngTemplateOutlet="ading_new_stock"></ng-container>
+    <ng-container *ngTemplateOutlet="ading_new_sodeod"> </ng-container>
+
+  </mat-tab>
+
+  <!-- Existing Products Tab -->
+  <mat-tab label="Existing Products">
+   <!--    <ng-container *ngTemplateOutlet="productSelector; context: { name: 'products_delete' }"></ng-container> -->
+    <ng-container *ngTemplateOutlet="editTab; context: { name: 'products_existing' }"></ng-container>
+   <!-- <app-edit-existing></app-edit-existing> -->
+  </mat-tab>
+
+  <!-- Delete Tab 
+  <mat-tab label="Delete">
+    <ng-container *ngTemplateOutlet="productSelector; context: { name: 'products_delete' }"></ng-container>
+    <ng-container *ngTemplateOutlet="deleteTab; context: { name: 'products_delete' }"></ng-container>
+  </mat-tab>
+-->
+  <!-- Reports Tab -->
+  <mat-tab label="Reports">
+    <div style="margin-top: 20px;">
+      <h4>Product Reports</h4>
+      <ng-container *ngTemplateOutlet="reportsTab"></ng-container>
+    </div>
+  </mat-tab>
+</mat-tab-group>
+
+
+    
+
+<!-- Edit Tab -->
+<ng-template #editTab let-name="name">
+  <p>Editing Product</p>
+ <!-- <button class="dropdown-item" (click)="EditToggle()">Edit Candy</button> -->
+
+<!--  <app-edit-existing></app-edit-existing> -->
+<!--  <app-edit-image-viewer></app-edit-image-viewer>  -->
+  <app-yummy-list-table></app-yummy-list-table>
+</ng-template>
+
+<!-- Add New Tab -->
+<ng-template #newTab let-name="name">
+  <div *ngIf="captureService.addNewCandyState" class="p-4">
+    <p class="text-xl font-semibold mb-4">Add New Product #{{ productService.nextProductId_universal }}</p>
+
+    <mat-stepper labelPosition="bottom" #stepper>
+      <!-- Step 1 -->
+      <mat-step [stepControl]="matTableService.firstFormGroup">
+        <form [formGroup]="matTableService.form" (ngSubmit)="submitProductDetails()" class="space-y-4">
+          <div formGroupName="pnmat">
+            <mat-form-field appearance="fill" class="w-100">
+              <mat-label>Product Name</mat-label>
+              <input matInput type="text" formControlName="productName" required />
+            </mat-form-field>
+
+            <mat-form-field appearance="fill" class="w-100">
+              <mat-label>Product Flavor</mat-label>
+              <input matInput type="text" formControlName="productFlavor" required />
+            </mat-form-field>
+
+            <mat-form-field appearance="fill" class="w-100">
+              <mat-label>Product Quantity</mat-label>
+              <input matInput type="number" formControlName="productQuantity" required />
+            </mat-form-field>
+
+            <mat-form-field appearance="fill" class="w-100">
+              <mat-label>Product Size</mat-label>
+              <input matInput type="text" formControlName="productSize" required step="0.01" min="0" />
+            </mat-form-field>
+
+            <mat-form-field appearance="fill" class="w-100">
+              <mat-label>Product Price</mat-label>
+              <input matInput type="number" formControlName="productPrice" required />
+            </mat-form-field>
+          </div>
+
+          <div class="flex justify-start space-x-4 mt-4">
+            <button mat-flat-button color="primary" matStepperNext (click)="submitForm()" type="submit">
+              Submit
+            </button>
+            <button mat-stroked-button color="warn" type="button" (click)="clearProductForm()">
+              Clear
+            </button>
+          </div>
+        </form>
+      </mat-step>
+
+      <!-- Final Step -->
+      <mat-step>
+        <ng-template matStepLabel>Done</ng-template>
+        <p class="text-lg my-4">You are now done.</p>
+        <button mat-flat-button color="accent" (click)="resetStepper(stepper)">Add Another Product</button>
+      </mat-step>
+    </mat-stepper>
+  </div>
+
+  <!-- Success GIF -->
+  <div *ngIf="captureService.addNewCandyState && captureService.httpCallDOne" class="flex justify-center items-center mt-6">
+    <iframe
+      src="https://expose_images.justdo-it.uk/success/Success_2.gif"
+      width="90%"
+      height="90%"
+      frameborder="0"
+      class="rounded-lg shadow-lg"
+    ></iframe>
+  </div>
+</ng-template>
+
+
+<!-- Delete Tab -->
+<ng-template #deleteTab let-name="name">
+  <h1>Delete Products</h1>
+<div>
+  <input [(ngModel)]="captureService.productId_toDelete" placeholder="Enter Product ID" />
+  <button (click)="productService.deleProduct(captureService.productId_toDelete)">Send</button>
+
+</div>
+
+</ng-template>
+
+<!-- Product Selector -->
+<ng-template #productSelector let-name="name">
+  <mat-form-field>
+    <mat-label>List-Product</mat-label>
+    <mat-select
+      [formControl]="matTableService.pokemonControl"
+      (selectionChange)="onPokemonSelected($event)"
+      name="food"
+    >
+      <mat-option value="">-- None --</mat-option>
+      <ng-container *ngFor="let group of matTableService.pokemonGroups">
+        <mat-optgroup [label]="group.name" [disabled]="group.disabled">
+          <mat-option
+            *ngFor="let pokemon of group.pokemon"
+            (click)="matTableService.onOptionClick(pokemon, $event)"
+            [value]="pokemon.value"
+          >
+            {{ pokemon.viewValue }}
+          </mat-option>
+        </mat-optgroup>
+      </ng-container>
+    </mat-select>
+  </mat-form-field>
+</ng-template>
+
+<!-- Cart Tab -->
+<ng-template #viewCartTab>
+
+
+</ng-template>
+
+<!-- Reports Tab -->
+<ng-template #reportsTab>
+
+  
+  <ng-container *ngTemplateOutlet="prevProductlist"></ng-container>
+  <ng-container *ngTemplateOutlet="prevYummyListTable"></ng-container>
+  <ng-container *ngTemplateOutlet="prevAvailableItems"></ng-container>
+  <ng-container *ngTemplateOutlet="prevEstimateReport"></ng-container>
+</ng-template>
+
+
+
+<!-- Reusable Templates -->
+<ng-template #prevProductlist>
+  <app-product-list-table></app-product-list-table>
+</ng-template>
+
+<ng-template #prevAvailableItems>
+  <app-available-items-list-table></app-available-items-list-table>
+</ng-template>
+
+<ng-template #prevEstimateReport>
+  <app-estimates-report></app-estimates-report>
+</ng-template>
+
+<ng-template #prevSodEodTable>
+  <app-sod-eod-report></app-sod-eod-report>
+</ng-template>
+
+<ng-template #newSodEodTable>
+  <app-sod-eod-list-table></app-sod-eod-list-table>
+</ng-template>
+
+<ng-template #prevStockTable>
+  <app-stock-prev-table></app-stock-prev-table>
+</ng-template>
+
+<ng-template #prevYummyListTable>
+  <app-yummy-list-table></app-yummy-list-table>
+</ng-template>
+<ng-template #prevProductItemPricingTable> 
+  <app-product-item-pricing-list></app-product-item-pricing-list>
+</ng-template>
+
+<ng-template #ading_new_stock>
+   <div *ngIf="captureService.stockItemsState">
+      <p>New Stock Something</p>
+      <!-- <app-product-availability-option></app-product-availability-option>
+      <app-checkbox-option></app-checkbox-option>
+      <app-preview-view></app-preview-view>-->
+      <app-stock-prev-table></app-stock-prev-table>
+    </div>
+
+</ng-template>
+
+<ng-template #ading_new_sodeod>
+<div *ngIf="captureService.sod_eod_state">
+  <!--      
+      <app-product-availability-option></app-product-availability-option>
+      <app-checkbox-option></app-checkbox-option>
+      <app-sod-eod-list-table></app-sod-eod-list-table>
+      <app-checkbox></app-checkbox>
+      -->
+            <app-checkbox-option></app-checkbox-option>
+
+      <app-sod-eod-list-table></app-sod-eod-list-table>
+    </div>
+
+ </ng-template>
+
+<ng-template>
+        <app-add-new-items></app-add-new-items>
+      <app-sod-eod></app-sod-eod>
+        <app-checkbox-option></app-checkbox-option>
+      <app-sod-eod-list-table></app-sod-eod-list-table>
+      <app-sod-eod></app-sod-eod>
+</ng-template>
+
+<ng-template #ading_new>
+  <div *ngIf="captureService.stockItemsState || captureService.addNewCandyState || captureService.editExistingCandyState || captureService.sod_eod_state">
+    <app-add-new></app-add-new>
+    <div *ngIf="captureService.editExistingCandyState">
+      <app-checkbox></app-checkbox>
+      <app-edit-existing></app-edit-existing>
+    </div>
+  </div>
+</ng-template>
+
+<ng-template #adding_new_product> 
+  <app-add-new></app-add-new>
+</ng-template>

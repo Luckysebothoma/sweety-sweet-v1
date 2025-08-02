@@ -1,0 +1,26 @@
+<p>mat-card works!</p>
+<mat-grid-list cols="2" rowHeight="2:1">
+  <mat-grid-tile>
+    <img [src]="imageUploadService.previewUrl" alt="Preview" />
+
+  </mat-grid-tile>
+
+  <mat-grid-tile>
+    <h4> Product Details </h4>
+      
+  <div class="" *ngIf="imageUploadService.previewUrl">
+    <h3>Image Preview</h3>
+
+    <div class="file-details" *ngIf="productService.selectedFiles">
+
+      <p><strong>New Product Name:</strong> {{productService.form_productName}}</p>
+      <p><strong>New Product Flavor:</strong> {{productService.form_productFlavor}}</p>
+      <p><strong>New Product Price:</strong> {{productService.form_productPrice}}</p>
+      <p><strong>New Product Quantity:</strong> {{productService.form_productQuantity}}</p>
+      <p><strong>New File Name:</strong> {{productService.newFileName}}</p>
+      
+    </div>
+  </div>
+  </mat-grid-tile>
+  
+</mat-grid-list>

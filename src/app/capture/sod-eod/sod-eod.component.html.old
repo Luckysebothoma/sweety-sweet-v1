@@ -1,0 +1,57 @@
+<div class="mat-table-container">
+  <form (ngSubmit)="productService.showOnMatTable('SodEod')">
+    <h3>Older SodEod</h3>
+
+    <table mat-table [dataSource]="productService.dataSourceSodEod" class="mat-elevation-z8" multiTemplateDataRows>
+ 
+      <!-- Product ID Column -->
+      <ng-container matColumnDef="productId">
+        <th mat-header-cell *matHeaderCellDef>Product Id</th>
+        <td mat-cell *matCellDef="let product">{{ product.productId }}</td>
+      </ng-container>
+
+      <!-- Product Name Column -->
+      <ng-container matColumnDef="productName">
+        <th mat-header-cell *matHeaderCellDef>Product Name</th>
+        <td mat-cell *matCellDef="let product">
+          {{ product.productName }}
+          <span *ngIf="product.availableItems === 0" class="alert-state alert-critical outOfStock">Out Of Stock ..!</span>
+          <span *ngIf="product.availableItems > 0 && product.availableItems <= 50" class="alert-critical">Availability {{ product.availableItems }}</span>
+          <span *ngIf="product.availableItems > 50 && product.availableItems <= 100" class="alert-danger">Availability {{ product.availableItems }}</span>
+          <span *ngIf="product.availableItems > 100 && product.availableItems <= 150" class="alert-warning">Availability {{ product.availableItems }}</span>
+          <span *ngIf="product.availableItems > 150" class="alert-state alert-success">Availability {{ product.availableItems }}</span>
+          <span *ngIf="product.availableItems < 0" class="alert-state alert-invalid">Invalid {{ product.availableItems }}</span>
+        </td>
+      </ng-container>
+
+      <!-- Items Taken Column -->
+      <ng-container matColumnDef="itemsTaken">
+        <th mat-header-cell *matHeaderCellDef>Items to be Taken</th>
+        <td mat-cell *matCellDef="let product; let i = index">
+          <input matInput [(ngModel)]="product.itemsTaken" [name]="'itemsTaken_' + i" *ngIf="!product.outOfStock">
+        </td>
+      </ng-container>
+
+      <!-- Items Remaining Column -->
+      <ng-container matColumnDef="itemsRemaining">
+        <th mat-header-cell *matHeaderCellDef>Items Remaining</th>
+        <td mat-cell *matCellDef="let product; let i = index">
+          <input matInput [(ngModel)]="product.itemsRemaining" [name]="'itemsRemaining_' + i" *ngIf="!product.outOfStock">
+        </td>
+      </ng-container>
+
+      <!-- Date Column -->
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef>Date</th>
+        <td mat-cell *matCellDef="let product">
+          {{ productService.formatDate(product.date) }}
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumnsSodEod"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumnsSodEod;"></tr>
+    </table>
+
+    <button mat-flat-button color="primary" type="submit">Submit</button>
+  </form>
+</div>

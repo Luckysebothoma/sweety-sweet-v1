@@ -1,0 +1,50 @@
+{
+  "name": "sweety-sweet-app",
+  "version": "0.0.1",
+  "scripts": {
+    "ng": "ng",
+    "https": "ng serve --ssl --ssl-cert /certs/cert.pem --ssl-key /certs/privkey.pem --disable-host-check --host 0.0.0.0 --port 4200",
+    "build": "ng build",
+    "http": "ng serve --host 0.0.0.0 --port 4200 --disable-host-check",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^18.2.9",
+    "@angular/cdk": "^18.2.10",
+    "@angular/common": "^18.2.9",
+    "@angular/compiler": "^18.2.9",
+    "@angular/core": "^18.2.9",
+    "@angular/flex-layout": "^15.0.0-beta.42",
+    "@angular/forms": "^18.2.9",
+    "@angular/material": "^18.2.10",
+    "@angular/platform-browser": "^18.2.9",
+    "@angular/platform-browser-dynamic": "^18.2.9",
+    "@angular/router": "^18.2.9",
+    "@auth0/auth0-angular": "^2.2.3",
+    "@cloudflare/kv-asset-handler": "^0.4.0",
+    "axios": "^1.9.0",
+    "bootstrap": "^5.3.7",
+    "fs-extra": "^11.3.0",
+    "node": "^22.6.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zone.js": "~0.14.4"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^18.2.10",
+    "@angular/cli": "~18.2.10",
+    "@angular/compiler-cli": "^18.2.9",
+    "@types/body-parser": "^1.19.5",
+    "@types/jasmine": "~4.3.0",
+    "jasmine-core": "~4.6.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
+    "typescript": "~5.4.4",
+    "wrangler": "^4.18.0"
+  }
+}

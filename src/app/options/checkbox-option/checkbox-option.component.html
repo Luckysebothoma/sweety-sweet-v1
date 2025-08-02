@@ -1,0 +1,43 @@
+<!-- SOD-EOD Section -->
+<div *ngIf="productService.sod_eod_component && yummyList.length > 0">
+  <h3>WEEEEEEEEEEEEE Checkbox-option - Select Items to add to SOD-EOD</h3>
+<!-- 
+  <app-product-availability-option></app-product-availability-option>
+-->
+<mat-checkbox
+  *ngFor="let product of yummyList; let i = index"
+  (change)="productService.updateSelectedProducts($event, product, i, 'AddNewSodEod')"
+>
+  {{ i + 1 }}. {{ product.productName }} - {{ product.productFlavor }}
+</mat-checkbox>
+
+</div>
+
+<!-- New Stock Section -->
+<div *ngIf="productService.newStock_component && yummyList.length > 0">
+  <!-- 
+  <app-product-availability-option></app-product-availability-option>
+-->
+  <h3>Wewewe Checkbox-option - Capture Checkbox - Add New Stock</h3>
+
+  <mat-checkbox *ngFor="let product of yummyList; let i = index" 
+                (change)="productService.updateSelectedProducts($event, product, i, 'AddNew')"> 
+    {{ i + 1 }}. {{ product.productId }}
+  </mat-checkbox>
+ 
+    <mat-checkbox *ngFor="let product of yummyList; let i = index" 
+                (change)="productService.updateSelectedProducts($event, product, i, 'AddNew')"> 
+    {{ i + 1 }}. {{ product.productId }}
+  </mat-checkbox>
+
+ </div>
+
+
+<div *ngIf="productService.sod_eod_component && !(yummyList.length >0)">
+  
+<iframe src="https://expose_images.justdo-it.uk/loader/truck%20off%20load.gif" 
+width="50%" 
+height="50%" 
+frameborder="0"></iframe>
+
+ </div>

@@ -1,0 +1,21 @@
+<div class="image-upload-container">
+  
+  <div class="file-selection">
+    <input type="file" (change)="onFileChange($event)" accept="image/*" />
+  </div>
+  
+  <div class="" *ngIf="imageService.ReadyTopreviewUrl">
+    <div class="file-details" *ngIf="productService.selectedFiles">
+
+      <p><strong>File Name:</strong> {{productService.fileName}}</p>
+      <p><strong>File Type:</strong> {{productService.fileType}}</p>
+      <p><strong>File Size:</strong> {{(productService.fileSize / 1024).toFixed(2)}} KB</p>
+      <p><strong>New File Key:</strong> {{productService.key}}</p>
+    
+    </div>
+  </div>
+  
+  <div class="message" *ngIf="productService.message">
+    <p>{{productService.message}}</p>
+  </div>
+</div>

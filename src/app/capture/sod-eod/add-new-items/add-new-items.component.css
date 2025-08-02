@@ -1,0 +1,5 @@
+/* Change background color and text color on hover */
+.mat-option:hover:not(.mat-option-disabled) {
+    background: #3071a9;
+    color: white;
+  }

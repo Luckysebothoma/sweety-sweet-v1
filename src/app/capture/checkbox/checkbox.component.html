@@ -1,0 +1,26 @@
+
+
+<h1> Older Checkout - mat-checkbox </h1>
+<table>
+    
+    <tbody>
+        <tr>
+            <td> 
+                td 1
+
+            </td>
+
+            <td>
+                td2
+
+            </td>
+            capture Checkbox
+            <mat-checkbox class="mat-checkbox-bg" *ngFor="let product of productService.productListToShowOnCheckBox_AddNew; let i = index"              
+                  (change)="productService.updateSelectedProducts($event, product,i, 'AddNew')">
+
+                {{i + 1}}.{{product.productName}}
+ 
+                </mat-checkbox>
+        </tr>
+    </tbody>
+</table>

@@ -1,0 +1,265 @@
+import { Component } from '@angular/core';
+import { ImageUploadService } from './image-upload.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from 'src/environments/environment';
+import { ProductService } from 'src/app/product/product.service';
+import { CaptureService } from 'src/app/capture/capture.service';
+import { Observable } from 'rxjs';
+import { HttpClientService } from 'src/app/Services/http-client.service';
+import { ImageService } from '../image.service';
+import { MatTableService } from 'src/app/Tables/mat-table.service';
+import { MatTableServiceService } from 'src/app/Services/mat-table-service.service';
+import { DateTimeService } from 'src/app/Services/date-time.service';
+import { NewProductList } from 'src/app/models/candy-list';
+
+@Component({
+  selector: 'app-image-upload',
+  templateUrl: './image-upload.component.html',
+  styleUrls: ['./image-upload.component.css']
+})
+export class ImageUploadComponent {
+  uploadUrl = 'https://nodejs.justdo-it.uk/'; // Adjust with your Nginx URL
+
+  constructor(private http: HttpClient, public productService: ProductService,
+    public captureServices: CaptureService,
+    private local_http: HttpClientService, 
+    public imageUploadService: ImageUploadService,
+    public imageService: ImageService,
+    public matTableService:MatTableServiceService, private dateTimeService: DateTimeService
+  ) {}
+
+  onFileChange(event: any): void {
+    const target = event.target as HTMLInputElement;
+    // Check if the target is actually an HTMLInputElement and if files are available
+    if (target && target.files && target.files.length > 0) {
+
+      this.productService.selectedFiles = target.files;
+      this.productService.fileName = this.productService.selectedFiles[0].name;
+      this.productService.fileType = this.productService.selectedFiles[0].type;
+      this.productService.fileSize = this.productService.selectedFiles[0].size;
+      const index = this.productService.fileType.search("/") + 1;
+      this.productService.newFileName = "product" + "_" + this.productService.nextProductId_universal + "." + this.productService.fileType.slice(index);
+     
+      // Generate preview for the selected image
+   //    this.generatePreview(this.productService.selectedFiles[0]);
+
+
+       const newProductOnBoarding = this.matTableService.getFormValues();
+
+      console.log("onFileChange() : this.selectedFiles: ", this.productService.selectedFiles);
+      console.log("onFileChange() : fileName", this.productService.fileName);
+      console.log("onFileChange() : fileType", this.productService.fileType);
+      console.log("onFileChange() : filSize", this.productService.fileSize);
+      console.log('onFileChange() : Next ProductId', this.productService.nextProductId_universal);
+      console.log("onFileChange() : New fileName", this.productService.newFileName);
+      console.log("onFileChange() : New Candy Name : ", newProductOnBoarding.productName);
+      console.log("onFileChange() : New Candy Flavor : ", newProductOnBoarding.productFlavor);
+      console.log("onFileChange() : New Candy Price : ", newProductOnBoarding.productPrice);
+      console.log("onFileChange() : New Candy Quantity : ",newProductOnBoarding.productQuantity);
+      console.log("onFileChange() : New Candy Size : ", newProductOnBoarding.productSize);
+
+      // #####################################
+
+      const group = this.matTableService.getFormValues(); 
+    console.log(this.dateTimeService.formatDate(Date.now()) + "Submiting new product from mat for group: ", group)
+    if (group) {
+      // ✅ Assign form values to local object
+      let productData:NewProductList = {
+        productId: this.productService.nextProductId_universal,
+        productName: group.productName,
+        productFlavor: group.productFlavor,
+        productPrice: parseInt(group.productPrice),
+        productQuantity: parseInt(group.productQuantity),
+        productSize: parseInt(group.productSize),
+        image_url: `${group.productName}.png`,
+        itemGrouping: ''
+      };
+
+
+      console.log("onFileChange() :productService New Candy Name : ",  group.productName); 
+      console.log("onFileChange() :productService New Candy Flavor : ",  group.productFlavor);
+      console.log("onFileChange() :productService New Candy Price : ",  group.productPrice);
+      console.log("onFileChange() :productService New Candy Quantity : ",  group.productQuantity);
+      console.log("onFileChange() :productService New Candy Size : ",  group.productSize);
+
+        console.log(this.dateTimeService.formatPartial(Date.now()) + ":  "+this.dateTimeService.formatPartial(Date.now()) + ":  Submitting New Product Form:" + JSON.stringify(productData))
+    }
+
+      // ###################################
+
+           // Store relevant data in localStorage
+    localStorage.setItem('selectedFiles', JSON.stringify(this.productService.selectedFiles));
+    localStorage.setItem('fileName', this.productService.fileName);
+    localStorage.setItem('fileType', this.productService.fileType);
+    localStorage.setItem('fileSize', this.productService.fileSize.toString());
+    localStorage.setItem('newFileName', this.productService.newFileName);
+    localStorage.setItem('nextProductId', this.productService.nextProductId_universal.toString());
+    localStorage.setItem('newCandyName', this.captureServices.newName);
+    localStorage.setItem('newCandyFlavor', this.captureServices.newFlavor);
+    localStorage.setItem('newCandyPrice', this.captureServices.newPrice.toString());
+    localStorage.setItem('newCandyQuantity', this.captureServices.newQuantity.toString());
+    localStorage.setItem('newCandySize', this.captureServices.newSize.toString());
+    const file = this.productService.selectedFiles[0];
+      
+
+/*
+    
+  this.local_http.getTempKey().subscribe({
+    next: (res) => {
+      // handle the response here if needed 
+      let key = res.key
+      this.productService.key = key;
+//      this.imageService.uploadImageWithKey(file,key);
+      this.uploadImages();
+      console.log("DOne Generating new temp key: " + key );
+      this.loadImagePreview(key);
+      
+    },
+    error: (err) => {
+      console.error('Error fetching temp key:', err);
+    }
+  });
+  */
+
+/*
+    let universal_key='';
+
+   this.local_http.uploadTempImage(file).subscribe({
+      next: res =>{
+        const key = res;
+        universal_key = res;
+          console.log("TEMP KEY:" + key);
+          
+          this.local_http.getTempImageByKey(universal_key).subscribe({
+            next: res=>{
+              console.log("Redis: CACHED: "+ universal_key + res)
+            }
+          })
+      }
+    })
+    */
+/*    try {
+      const formData = new FormData();
+    formData.append('image', this.productService.selectedFiles[0],this.productService.newFileName);
+
+    this.http.post('http://localhost:3000/upload-image', formData).subscribe({
+      next: res => console.log('Uploaded successfully:', res),
+      error: err => console.error('Upload error:', err)
+    });
+    } catch (error) {
+      
+    }
+*/
+    } else {
+      console.error('No files selected or event target is not an HTMLInputElement.');
+      
+    }
+    console.log("onFileChange: ", event);
+  }
+
+  // Method to generate preview of the selected image
+  generatePreview(file: File): void {
+    if (!file.type.match('image.*')) {
+      this.imageUploadService.previewUrl = null;
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      this.imageUploadService.previewUrl = e.target.result;
+    };
+    console.log("Image preveiw Loaded")
+    reader.readAsDataURL(file);
+  }
+
+    loadImagePreview(key: string): void {
+
+      console.log("now loading key: " + key)
+    this.local_http.getTempImageByKey(key).subscribe({
+      next: blob => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          this.imageUploadService.previewUrl = reader.result as string;
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: err => console.error('Preview fetch error', err)
+    });
+  }
+  // Method to clear the preview and reset selection
+
+  // Method to gather data from localStorage and send to Nginx
+  uploadData(key:any): Observable<any> {
+    // Retrieve data from localStorage
+ /*   const selectedFiles = localStorage.getItem('selectedFiles');
+    const fileName = localStorage.getItem('fileName');
+    const fileType = localStorage.getItem('fileType');
+    const fileSize = localStorage.getItem('fileSize');
+    const newFileName = localStorage.getItem('newFileName');
+    const nextProductId = localStorage.getItem('nextProductId');
+    const newCandyName = localStorage.getItem('newCandyName');
+    const newCandyFlavor = localStorage.getItem('newCandyFlavor');
+    const newCandyPrice = localStorage.getItem('newCandyPrice');
+    const newCandyQuantity = localStorage.getItem('newCandyQuantity');
+    const newCandySize = localStorage.getItem('newCandySize');
+*/
+    
+    // Organize data into an object
+/*    const data = {
+      selectedFiles: JSON.parse(selectedFiles || '[]'),
+      fileName,
+      fileType,
+      fileSize,
+      newFileName,
+      nextProductId,
+      newCandyName,
+      newCandyFlavor,
+      newCandyPrice,
+      newCandyQuantity,
+      newCandySize,
+    };
+*/
+    // Send the data to the server
+
+    const data = this.local_http.getTempImageByKey(key).subscribe({
+      next: (res: any) => {
+        
+
+      },
+      error: (error) => {
+        
+      }
+    })
+
+    return this.http.post(this.uploadUrl, data);
+  }
+
+
+
+  uploadImages(): void {
+
+    if (this.productService.selectedFiles && this.productService.selectedFiles.length > 0) {
+      const formData = new FormData();
+
+      for (let i = 0; i < this.productService.selectedFiles.length; i++) {
+        console.log("[" + i + "]: " + "this.selectedFiles[i]" + 
+
+          this.productService.selectedFiles[i] + "this.selectedFiles[i].name" + this.productService.selectedFiles[i].name);
+        formData.append('images', this.productService.selectedFiles[i], this.productService.selectedFiles[i].name);
+      }
+      this.http.post("https://nodejs.justdo-it.uk" + '/upload', this.productService.selectedFiles[0]).subscribe(
+        (response) => {
+          this.productService.message = 'Images uploaded successfully!';
+          this.imageUploadService.clearPreview(); // Clear preview after successful upload
+        },
+        (error) => {
+          this.productService.message = 'Error uploading images! \n';
+          console.error('Error:', error);
+        }
+      );
+    } else {
+      this.productService.message = 'Please select images to upload!';
+    }
+  }
+}
+ 

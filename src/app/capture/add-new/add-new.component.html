@@ -1,0 +1,47 @@
+<div class="WrapperAddNewProduct" *ngIf="captureServie.addNewCandyState">
+  <mat-card class="mat-elevation-z4" style="padding: 24px; margin: 16px;">
+    <h2 mat-card-title>Add Producto</h2>
+
+    <form (ngSubmit)="captureServie.submitForm()" enctype="multipart/form-data">
+
+      <div class="form-section">
+        <h3>Adding New Item Details</h3>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Product Name</mat-label>
+          <input matInput placeholder="Enter Item Name" [(ngModel)]="captureServie.newName" name="name">
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Product Flavor</mat-label>
+          <input matInput placeholder="Enter Item Flavor" [(ngModel)]="captureServie.newFlavor" name="flavor">
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Product Price</mat-label>
+          <input matInput placeholder="Enter Cost Price" [(ngModel)]="captureServie.newPrice" name="CostPrice" type="number">
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Product Quantity</mat-label>
+          <input matInput placeholder="Enter Product Quantity" [(ngModel)]="captureServie.newQuantity" name="Product_Quantity" type="number">
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="full-width">
+          <mat-label>Product Size</mat-label>
+          <input matInput placeholder="Enter Product Size" [(ngModel)]="captureServie.newSize" name="ProductSize">
+        </mat-form-field>
+      </div>
+
+      <div class="form-section">
+        <h3>Upload Image Option</h3>
+        <app-image-upload></app-image-upload>
+      </div>
+
+      <div class="form-actions">
+        <button mat-raised-button color="primary" type="submit">Submit</button>
+      </div>
+
+    </form>
+  </mat-card>
+</div>
