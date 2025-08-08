@@ -23,7 +23,13 @@ export class AvailableItemsListTableComponent implements AfterViewInit{
 
     this.loadTableData();
   }
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
 
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
   loadTableData(){
         this.productService.getAvailableItems().subscribe(availableItemsResponse => {
       const rawAvailableItems = Array.isArray(availableItemsResponse)

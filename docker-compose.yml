@@ -2,15 +2,15 @@ networks:
   sweety-sweet-network-bridge:
     driver: bridge
     external: true
-    internal: false
+    
   sweety-sweet-tunnel:
     driver: bridge
     external: true
-    internal: false
+    
   node-exporter:
     driver: bridge
     external: true
-    internal: false
+    
 
 volumes:
   certs:

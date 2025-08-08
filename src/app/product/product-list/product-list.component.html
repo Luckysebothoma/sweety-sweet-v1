@@ -47,7 +47,9 @@
               <img
                 [src]="imageService.getImageUrl_nginx(product.productId)"
                 [alt]="product.productName"
-              />  
+                (error)="onImageError($event)"
+                />  
+
           </mat-card>
 
         </div>

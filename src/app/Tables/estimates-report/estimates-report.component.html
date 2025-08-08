@@ -20,7 +20,12 @@
       <mat-header-cell *matHeaderCellDef> Product ID </mat-header-cell>
       <mat-cell *matCellDef="let element">
         {{ element.productId }}
-        <img [src]="imageService.getImageUrl_nginx(element.productId)" style="max-width: 100px; margin-left: 10px;" alt="Product image">
+        <img [src]="imageService.getImageUrl_nginx(element.productId)" 
+        style="max-width: 100px; margin-left: 10px;" 
+        alt="Product image"
+        (error)="onImageError($event)"
+        >
+        
       </mat-cell>
     </ng-container>
   

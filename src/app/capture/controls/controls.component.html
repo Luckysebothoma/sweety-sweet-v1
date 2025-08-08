@@ -189,6 +189,9 @@
   <ng-container *ngTemplateOutlet="prevYummyListTable"></ng-container>
   <ng-container *ngTemplateOutlet="prevAvailableItems"></ng-container>
   <ng-container *ngTemplateOutlet="prevEstimateReport"></ng-container>
+  <ng-template *ngTemplateOutlet="prevProductItemPricingList"> </ng-template>
+
+
 </ng-template>
 
 
@@ -200,6 +203,10 @@
 
 <ng-template #prevAvailableItems>
   <app-available-items-list-table></app-available-items-list-table>
+</ng-template>
+
+<ng-template #prevProductItemPricingList>
+  <app-product-item-pricing-list></app-product-item-pricing-list>
 </ng-template>
 
 <ng-template #prevEstimateReport>

@@ -1,1 +1,67 @@
-<p>product-item-pricing-list works! </p>
+<div class="mat-elevation-z8">
+
+  <mat-card-header>
+    <mat-card-title>Product Item Pricing</mat-card-title>
+
+  </mat-card-header>
+
+  <table mat-table [dataSource]="dataSource" class="full-width-table">
+
+    <ng-container matColumnDef="count">
+      <th mat-header-cell *matHeaderCellDef> Count </th>
+      <td mat-cell *matCellDef="let element"> {{element.count}} </td>
+
+    </ng-container>
+
+    <ng-container matColumnDef="productId">
+      <th mat-header-cell *matHeaderCellDef> Product ID </th>
+      <td mat-cell *matCellDef="let element"> {{element.productId}}
+        <img [src]="imageService.getImageUrl_nginx(element.productId)" style="max-width: 100px; margin-left: 10px;" alt="Product image"
+        (error)="onImageError($event)"
+        >
+       </td>
+      
+
+    </ng-container>
+
+    <ng-container matColumnDef="productDescription">
+      <th mat-header-cell *matHeaderCellDef> Description </th>
+      <td mat-cell *matCellDef="let element"> {{element.productDescription || '-' }} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="itemGroup">
+      <th mat-header-cell *matHeaderCellDef> Group </th>
+      <td mat-cell *matCellDef="let element"> {{element.itemGroup}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="itemsRemainder">
+      <th mat-header-cell *matHeaderCellDef> Items Left </th>
+      <td mat-cell *matCellDef="let element"> {{element.itemsRemainder}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="costOfRemainder">
+      <th mat-header-cell *matHeaderCellDef> Cost </th>
+      <td mat-cell *matCellDef="let element"> {{element.costOfRemainder | number:'1.2-2'}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="groupedQuantity">
+      <th mat-header-cell *matHeaderCellDef> Quantity </th>
+      <td mat-cell *matCellDef="let element"> {{element.groupedQuantity}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="groupedProfit">
+      <th mat-header-cell *matHeaderCellDef> Profit </th>
+      <td mat-cell *matCellDef="let element"> {{element.groupedProfit | number:'1.2-2'}} </td>
+    </ng-container>
+
+    <ng-container matColumnDef="groupedCommission">
+      <th mat-header-cell *matHeaderCellDef> Commission </th>
+      <td mat-cell *matCellDef="let element"> {{element.groupedCommission | number:'1.2-2'}} </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+  </table>
+
+  <mat-paginator [pageSizeOptions]="[3, 5, 10, 25]" showFirstLastButtons></mat-paginator>
+</div>

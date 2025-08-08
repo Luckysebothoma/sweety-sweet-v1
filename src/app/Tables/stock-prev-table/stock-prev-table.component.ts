@@ -56,6 +56,13 @@ export class StockPrevTableComponent implements OnInit {
 
 
   }
+  onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
+
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
 
   ngOnInit(): void {
     const timestamp = new Date().toISOString();

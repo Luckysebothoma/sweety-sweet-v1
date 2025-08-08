@@ -22,7 +22,9 @@
       <th mat-header-cell *matHeaderCellDef>ID</th>
       <td mat-cell *matCellDef="let row; let i = index">
         {{ row.productId }}
-        <img [src]="imageService.getImageUrl_nginx(row.productId)" alt="Product image" class="product-image">
+        <img [src]="imageService.getImageUrl_nginx(row.productId)" alt="Product image" class="product-image"
+              (error)="onImageError($event)"
+>
       </td>
     </ng-container>
 

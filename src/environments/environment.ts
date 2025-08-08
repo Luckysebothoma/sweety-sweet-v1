@@ -1,10 +1,10 @@
 
 export const environment = {
 	production: true,
-//	apiUrl: 'https://192.168.0.140:8083'
+//	apiUrl: 'https://node-js.justdo-it.uk'
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
-	apiUrl: 'https://192.168.0.140:8083',
+	apiUrl: 'https://node-js.justdo-it.uk',
 	redisPostgres:"https://redisPostgres.justdo-it.uk",
 	auth:{ 
         domain: 'dev-3ocho460qagqipds.us.auth0.com',
@@ -16,11 +16,12 @@ export const environment = {
     },
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
-      r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev"
+      r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
+      local_images:"https://expose_images.justdo-it.uk/local_images"
     },
     expose_image_gif:"https://expose_images.justdo-it.uk/images/gif",
 	  nodejs:{
-        full_api_path:'https://192.168.0.140:8083/api/v1/student',
+        full_api_path:'https://node-js.justdo-it.uk/api/v1/student',
     },
     backend_endpoints:{
         addPriceTracing:'addPriceTracing',
@@ -51,7 +52,7 @@ export const metrics ={
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
     monitoring: {
-        server: 'https://192.168.0.140:8083',
+        server: 'https://node-js.justdo-it.uk',
         frontendConsoleEndpoint: '/frontend-console-log',
         frontendErrorEndpoint: '/frontend-error',
         frontendMetricsEndpoint: '/frontend-metrics',
@@ -61,9 +62,9 @@ export const metrics ={
     },
     frontEndFullUrl: {
         
-        frontendConsoleUrl: 'https://192.168.0.140:8083/frontend-console-log',
-        frontendErrorUrl: 'https://192.168.0.140:8083/frontend-error',
-        frontendMetricsUrl: 'https://192.168.0.140:8083/frontend-metrics'
+        frontendConsoleUrl: 'https://node-js.justdo-it.uk/frontend-console-log',
+        frontendErrorUrl: 'https://node-js.justdo-it.uk/frontend-error',
+        frontendMetricsUrl: 'https://node-js.justdo-it.uk/frontend-metrics'
 
     }
 }

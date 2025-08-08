@@ -51,21 +51,17 @@ export class ProductListComponent implements OnInit {
 
             
           
-          console.log(`ProductListComponent : ${response}`);
+          console.log(`ProductListComponent : ${JSON.stringify(response)}`);
           console.log(`ProductListComponent stringified: ${JSON.stringify(response)}`);
 
           // Check if response has a 'data' property (API returns an object)
          // const data = Array.isArray(response) ? response : response? || [];
 
-          if (response.data.length > 0) {
+         
             this.productList = ResponseUtils.extractFirstArrayFromNested(response);
             this.filteredProducts = ResponseUtils.extractFirstArrayFromNested(response);
             console.log("filteredProducts Object: \n ", this.filteredProducts);
-            console.log();
-          } else {
-            this.productList = [];
-            this.filteredProducts = [];
-          }
+            
 
           this.truckloader = false;
           this.loaderBounceService.hideLoadingBounce();
@@ -95,8 +91,33 @@ export class ProductListComponent implements OnInit {
   }
 onImageError(event: Event) {
   const target = event.target as HTMLImageElement;
-  target.src = 'assets/image-not-found.png'; // or leave blank
+  target.src = this.imageService.fallbackImage; // or leave blank
+
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
 }
+async onImageLoad(productId: number, event: Event) {
+    const imgEl = event.target as HTMLImageElement;
+
+    try {
+      // Fetch the image file from the src
+      const response = await fetch(imgEl.src);
+      const blob = await response.blob();
+
+      const formData = new FormData();
+      formData.append('file', blob, `${productId}.jpg`);
+
+      // Send to backend with ?key=
+      this.httpClientService.post(`/images/temp`, formData)
+        .subscribe({
+          next: res => console.log('✅ Cached:', res),
+          error: err => console.error('❌ Cache error:', err)
+        });
+
+    } catch (err) {
+      console.error('Failed to process image:', err);
+    }
+  }
 
 
   addToCart(product: ProductList): void {

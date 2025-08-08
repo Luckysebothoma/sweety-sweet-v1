@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ViewChild } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatTableDataSource } from '@angular/material/table';
 import { DailyOperationsComponent } from 'src/app/capture/daily-operations/daily-operations.component';
+import { ImageService } from 'src/app/Images/image.service';
 import { ProductPricing } from 'src/app/models/candy-list';
 import { ProductService } from 'src/app/product/product.service';
 
@@ -16,7 +17,7 @@ export class ProductPricingListTableComponent implements AfterViewInit {
   displayedColumnsPricing: string[] = ['productId', 'productSize', 'productQuantity', 'costPerItem', 'productProfit', 'sellingPrice', 'productCommission'];
   dataSourcePricing = new MatTableDataSource<ProductPricing>();
 
-  constructor(public productService: ProductService){
+  constructor(public productService: ProductService, public imageService:ImageService){
 
   }
 
@@ -26,7 +27,13 @@ export class ProductPricingListTableComponent implements AfterViewInit {
       this.loadData();
 
 }
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
 
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
 loadData(){
     // Bind paginator to data sources
     this.dataSourcePricing.paginator = this.paginatorPricing;

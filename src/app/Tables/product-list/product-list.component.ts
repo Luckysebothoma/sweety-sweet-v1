@@ -71,7 +71,13 @@ loadData(){
       this.loadData();
 
 }
-  
+  onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
+
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
   getImageUrl(relativePath: string): string {
     return `${environment.expose_image}/${relativePath}`;
   }

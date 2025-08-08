@@ -46,7 +46,13 @@ loadTableData(){
       this.loadData();
 
 }
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
 
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
   loadData() {
     this.httpClientService.get<ApiResponse<SOD_EOD>>('getSodEodItems', '', 'getSodEodItems').subscribe(
       response_data => {

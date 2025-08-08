@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import axios from 'axios';
-import { metrics } from 'src/environments/environment';
+import { environment, metrics } from 'src/environments/environment';
 import { AppMetrics } from '../models/candy-list';
 import { LoggerRequestService } from './logger-request.service';
 
@@ -55,13 +55,13 @@ export class MetricsService {
     return this.postMetric(this.urls.console, payload, 'frontend console metric');
   }
 
-  sendFrontendConsoleLog(log: string) {
-    if (!log || typeof log !== 'string') {
+  sendFrontendConsoleLog(componentName: string, value: string) {
+    if (!value ) {
       console.error('❌ Invalid log format. Expected a string.');
       return;
     }
-    console.log("📝 Logging frontend console message:", log);
-    return this.postMetric(this.urls.console, { log }, 'frontend console log');
+    console.log("📝 Logging frontend console message:", value);
+    return this.postMetric(metrics.monitoring.server + metrics.monitoring.frontendConsolePath, { value }, 'frontend console log');
   }
 
   sendFrontendError(componentName: string, value: string) {
@@ -72,10 +72,11 @@ export class MetricsService {
 
   sendFrontendErrors(componentName: string, value: string) {
     const start = new Date();
-    this.sendFrontendConsoleLog(`Sending frontend error: ${componentName} with value: ${value} at ${start.toISOString()}`);
+
+    this.sendFrontendConsoleLog(`Sending frontend error: ${componentName} with value: ${value} at ${start.toISOString()}`, value);
     this.sendFrontendError(componentName, value);
     const end = new Date();
-    this.sendFrontendConsoleLog(`Finished sending frontend error at ${end.toISOString()}. Duration: ${end.getTime() - start.getTime()}ms`);
+    this.sendFrontendConsoleLog(`Finished sending frontend error at ${end.toISOString()}. Duration: ${end.getTime() - start.getTime()}ms`, '');
   }
 
   // Dynamically create and return AppMetric

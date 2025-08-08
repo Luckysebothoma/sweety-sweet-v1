@@ -36,6 +36,14 @@ ngAfterViewInit() {
   
 }
 
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
+
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
+
 loadTableData(){
   this.productService.getEstimates().subscribe(estimatesResponse => {
 //    const rawEstimates = Array.isArray(estimatesResponse.data)

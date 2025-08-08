@@ -213,6 +213,14 @@ removeCandy(row:any, i:number){
 
   this.loadTableData();
 }
+
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
+
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
 saveYummyListRow(yummyList: YummyList, index: number): void {
   // Optionally validate the item before saving
   if (

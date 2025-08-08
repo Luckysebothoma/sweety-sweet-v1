@@ -50,7 +50,13 @@ onEditChange(row: any): void {
   row.itemsTaken = Number(row.itemsTaken) || 0;
   row.itemsRemaining = Number(row.itemsRemaining) || 0;
 }
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
 
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
 computeRevenue(row: any): number {
   const diff = (row.itemsTaken ?? 0) - (row.itemsRemaining ?? 0);
   const sellingPrice = row.sellingPrice ?? 0;

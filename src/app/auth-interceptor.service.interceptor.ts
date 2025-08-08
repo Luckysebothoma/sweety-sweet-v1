@@ -28,14 +28,15 @@ export class AuthInterceptorServiceInterceptor implements HttpInterceptor {
  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     console.log("🔐 authInterceptorService now running");
 
+    
     return from(this.auth0.getAccessToken()).pipe(
       switchMap((token) => {
         const userFromToken = token ? this.jwtService.decodeJwt(token) : { email: 'unknown' };
         
         //const username = userFromToken?.email || 'anonymous';
 
-        // 📦 Log full outbound request context
-        this.loggerRequestService.logEvent("http_request_outgoing", {
+
+        let user_details = {
           timestamp: new Date().toISOString(),
           url: req.url,
           method: req.method,
@@ -44,13 +45,19 @@ export class AuthInterceptorServiceInterceptor implements HttpInterceptor {
           bodySize: req.body ? JSON.stringify(req.body).length : 0,
           user: JSON.stringify(userFromToken) || 'anonymous',
           requestId: this.generateRequestId()
-        });
+        }
+
+        // 📦 Log full outbound request context
+        this.loggerRequestService.logEvent("http_request_outgoing",user_details );
 
         // 🛡️ Inject the Authorization header
         const clonedReq = token
           ? req.clone({
               setHeaders: {
-                Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`,
+                'X-User-ID': user_details.user || 'anonymous' || 'anonymous',
+                'X-Correlation-ID': user_details.requestId,
+                
               }
             })
           : req;
@@ -68,7 +75,7 @@ export class AuthInterceptorServiceInterceptor implements HttpInterceptor {
   }
 
   private generateRequestId(): string {
-    return 'req-' + Math.random().toString(36).substr(2, 9);
+    return Math.random().toString(36).substr(2, 9);
   }
 
   private handleError(error: HttpErrorResponse) {
@@ -83,7 +90,9 @@ export class AuthInterceptorServiceInterceptor implements HttpInterceptor {
     }
 
     // Return an observable with a user-facing error message
-    return throwError(errorMessage);
-  }
+  //  return throwError(errorMessage);
+
+  return;
+}
 
 }
