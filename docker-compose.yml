@@ -50,6 +50,8 @@ services:
       - "4210:4200"
     container_name: sweety-app-dev
     restart: unless-stopped
+    mem_limit: 2000m
+    cpus: 0.5
 #    command: npm start
 #    command: ng serve --host 0.0.0.0 --poll 2000
     environment:

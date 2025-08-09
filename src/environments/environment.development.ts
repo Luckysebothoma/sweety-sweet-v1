@@ -40,6 +40,7 @@ export const environment = {
         addProduct:'addProduct',
         add2cart:'add2cart',
         add2Pricing:'add2Pricing',
+        addSod_Eod_List:"addListOfSodEod"
     }, 
     backend_get_endpoints:{
       getEstimates:"getEstimates",

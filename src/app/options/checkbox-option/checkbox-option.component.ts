@@ -21,7 +21,13 @@ getProductName(id:number):string{
   return this.productService.getProductNameById(id)
   //return ''
 }
+  onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = this.imageService.fallbackImage; // or leave blank
 
+  console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
+
+}
   ngOnInit(): void {
        console.log(this.dateTimeService.normalizeDate(Date.now())  +this.dateTimeService.formatDate(Date.now()) +" CheckboxOptionComponent ngOnInit timestamp")
     // This method is called when the component is initialized

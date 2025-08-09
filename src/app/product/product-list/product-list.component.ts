@@ -106,13 +106,14 @@ async onImageLoad(productId: number, event: Event) {
 
       const formData = new FormData();
       formData.append('file', blob, `${productId}.jpg`);
-
+console.log('✅  Ready to ship image')
+      
       // Send to backend with ?key=
-      this.httpClientService.post(`/images/temp`, formData)
-        .subscribe({
-          next: res => console.log('✅ Cached:', res),
-          error: err => console.error('❌ Cache error:', err)
-        });
+     // this.httpClientService.post(`/images/temp`, formData)
+     //   .subscribe({
+     //     next: res => console.log('✅ Cached:', res),
+     //     error: err => console.error('❌ Cache error:', err)
+     //   });
 
     } catch (err) {
       console.error('Failed to process image:', err);

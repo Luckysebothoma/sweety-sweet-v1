@@ -47,12 +47,14 @@ export class MetricsService {
     const payload = { metricName, value, type, labels };
     const url = `${this.urls.backend}${this.urls.metrics}`;
     console.log(`📤 Sending frontend metric: ${JSON.stringify(payload)}`);
-    return this.postMetric(url, payload, 'frontend metric');
+    //return this.postMetric(url, payload, 'frontend metric');
+    return
   }
 
   sendFrontendConsoleMetric(metricName: string, value: number, type: 'gauge' | 'counter' = 'gauge', labels: { appName: string, metrics: string }) {
     const payload = { metricName, value, type, labels };
-    return this.postMetric(this.urls.console, payload, 'frontend console metric');
+    //return this.postMetric(this.urls.console, payload, 'frontend console metric');  
+    return;
   }
 
   sendFrontendConsoleLog(componentName: string, value: string) {
@@ -61,13 +63,17 @@ export class MetricsService {
       return;
     }
     console.log("📝 Logging frontend console message:", value);
-    return this.postMetric(metrics.monitoring.server + metrics.monitoring.frontendConsolePath, { value }, 'frontend console log');
+    //return this.postMetric(metrics.monitoring.server + metrics.monitoring.frontendConsolePath, { value }, 'frontend console log');
+  
+    return;
   }
 
   sendFrontendError(componentName: string, value: string) {
     const payload = { componentName, value };
     console.log("🔥 Sending frontend error:", payload);
-    return this.postMetric(this.urls.error, payload, 'frontend error');
+    //return this.postMetric(this.urls.error, payload, 'frontend error');
+      
+    return;
   }
 
   sendFrontendErrors(componentName: string, value: string) {
@@ -77,6 +83,7 @@ export class MetricsService {
     this.sendFrontendError(componentName, value);
     const end = new Date();
     this.sendFrontendConsoleLog(`Finished sending frontend error at ${end.toISOString()}. Duration: ${end.getTime() - start.getTime()}ms`, '');
+  
   }
 
   // Dynamically create and return AppMetric

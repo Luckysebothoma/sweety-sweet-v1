@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { environment } from 'src/environments/environment';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, catchError, concatMap, forkJoin, from, lastValueFrom, map, of } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, concatMap, forkJoin, from, lastValueFrom, map, of, throwError } from 'rxjs';
 import { Product } from '../models/product';
 import {DataTransformer} from "../Class/Data-Transformer/data-transformer"
 
@@ -2519,6 +2519,41 @@ formatDate(dateString: any): Date {
  
 }
 
+getLastUpdateOnAvailableItems(productId:number): any{
+
+
+if(this.availableItems.length > 0 ){
+
+  for(let aItems of this.availableItems){
+
+    if(productId === aItems.productId){
+      return aItems.lastUpdated;
+
+    }
+  }
+}
+
+
+return this.dateTimeService.formatDate(Date.now(),"mysql")
+}
+getavailableitems(productId:number): number{
+let availableItems = -1;
+
+if(this.availableItems.length > 0 ){
+
+  for(let aItems of this.availableItems){
+
+    if(productId === aItems.productId){
+      availableItems = aItems.itemsRemaining;
+
+    }
+  }
+}
+
+
+return availableItems
+}
+
 sendDataSourceSodEod():void{
   let response: any[]=[];
   const temp = ResponseUtils.extractFirstArrayFromNested<MatTableSOD_EOD>(this.dataSourceSodEod.data.slice()); 
@@ -2956,6 +2991,29 @@ let sellingPrice:number=0;
   return sellingPrice;
 }
 
+
+getPrevAccumulatedAmountByProductId(productId:number):number{
+
+  let accAmount = -1;
+
+  if(this.priceTracingList.length > 0){
+
+    for(let pricetracing of this.priceTracingList){
+
+          if(productId === pricetracing.productId){
+
+            accAmount  = pricetracing.accAmount
+
+          }
+
+    }
+
+
+  }
+
+  return accAmount;
+}
+
 updatedAvaialbleItems_SodEod(sod_eod:MatTableSOD_EOD):AvailableItems{
 
   let updatedAvailableItems:AvailableItems={
@@ -3054,9 +3112,8 @@ if(operation === "SodEod"){
 
   
 
-  this.getAvailableItems().subscribe(
-    response=>{
-      this.availableItems = ResponseUtils.extractFirstArrayFromNested(response);
+ 
+     // this.availableItems = ResponseUtils.extractFirstArrayFromNested(response);
       console.log(functionName+ ` Done calling Available items`, this.availableItems)
 console.log(functionName + "passed _availableItems :", _availableItems)
 
@@ -3101,6 +3158,12 @@ console.log(functionName + "passed _availableItems :", _availableItems)
           lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
         }
 
+
+        let pricingTracing:PriceTracing ={
+          productId: productId,
+          lastUpdated: date,
+          accAmount: this.getPrevAccumulatedAmountByProductId(productId) + (this.getSellingPrice(productId))*(newEstimates.actualSelling)
+        }
         
         let newPriceTracing: ProductItemPricing ={
           productId: productId,
@@ -3149,7 +3212,27 @@ console.log(functionName + "passed _availableItems :", _availableItems)
 
         } 
 
- 
+
+        let sod_eodList ={
+          sodEOd:newSOD_EOD_Temp,
+          availableItems: newAvailableItems_After_Deductions,
+          estimates: newEstimates,
+          pricingTracing:pricingTracing,
+          ProductItemPricing:newPriceTracing
+        }
+        this.httpClientService.post<any>("addListOfSodEod",sod_eodList,"addListOfSodEod").subscribe(
+          {
+            next(value) {
+              console.log('Successfully Added the stock to backend '+ JSON.stringify(value))
+              
+            },error(err) {
+              console.error('Successfully Added the stock to backend ' + JSON.stringify(err))
+
+            },
+          }
+        )
+
+ /*
          this.httpClientService.post<SOD_EOD>(environment.backend_endpoints.addSodEodItems, newSOD_EOD_Temp, environment.backend_endpoints.addSodEodItems).subscribe(
           res =>{
             console.log("Done Updating with response: "+ ResponseUtils.extractFirstArrayFromNested(res))
@@ -3174,20 +3257,71 @@ console.log(functionName + "passed _availableItems :", _availableItems)
 
           }
          );
-         this.showSuccess("Done Adding " + operation)
-         
+        
+ 
+// Build the requests
+const requests = [
+  this.httpClientService.post<SOD_EOD>(
+    environment.backend_endpoints.addSodEodItems,
+    newSOD_EOD_Temp,
+    environment.backend_endpoints.addSodEodItems
+  ),
+  this.httpClientService.post<AvailableItems>(
+    environment.backend_endpoints.addAvailableItems,
+    newAvailableItems_After_Deductions,
+    environment.backend_endpoints.addAvailableItems
+  ),
+  this.httpClientService.post<EstimatedPricing>(
+    environment.backend_endpoints.addEstimates,
+    newEstimates,
+    environment.backend_endpoints.addEstimates
+  ),
+  this.httpClientService.post<ProductItemPricing>(
+    environment.backend_endpoints.addProductItemPricing,
+    newPriceTracing,
+    environment.backend_endpoints.add2Pricing
+  )
+];
 
-      }
+forkJoin(requests)
+  .pipe(
+    catchError(err => {
+      console.error('❌ One of the requests failed:', err);
+
+      this.showError(`❌ One of the requests failed: ${JSON.stringify(err)}`)
+ 
+      return throwError(() => err);
+    })
+  )
+  .subscribe({
+    next: (results) => {
+      console.log('✅ All requests succeeded:');
+      results.forEach(res => {
+        console.log(ResponseUtils.extractFirstArrayFromNested(res));
+      });
+
+      this.showSuccess(`✅ Done Adding + ${operation}`)
+    this.dataSourceSodEod.data.splice(0); // Remove
+
+ 
+    },
+    error: () => {
+      console.warn('❌ Transaction aborted.');
+      this.showError(`❌ Transaction aborted.${JSON.stringify(operation)}`)
 
     }
+  });
+
+*/
+      } // end of match if statement
+
+    } //End of for loop
     
 
 
   }
 
-    }
-  )
-
+    
   
   // cREATE dATA sETS
 

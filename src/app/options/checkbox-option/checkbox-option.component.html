@@ -1,17 +1,26 @@
 <!-- SOD-EOD Section -->
 <div *ngIf="productService.sod_eod_component && yummyList.length > 0">
-  <h3>WEEEEEEEEEEEEE Checkbox-option - Select Items to add to SOD-EOD</h3>
-<!-- 
-  <app-product-availability-option></app-product-availability-option>
--->
-<mat-checkbox
-  *ngFor="let product of yummyList; let i = index"
-  (change)="productService.updateSelectedProducts($event, product, i, 'AddNewSodEod')"
->
-  {{ i + 1 }}. {{ product.productName }} - {{ product.productFlavor }}
-</mat-checkbox>
+  <!--
+    <app-product-availability-option></app-product-availability-option>
+  -->
 
+  <mat-checkbox
+    *ngFor="let product of yummyList; let i = index"
+    #cb="matCheckbox"
+  [ngClass]="{ 'checked-bg': cb.checked }"
+    (change)="productService.updateSelectedProducts($event, product, i, 'AddNewSodEod')"
+  >
+    {{ i + 1 }}. {{ product.productName }} - {{ product.productFlavor }}
+<br>
+    <img
+      [src]="imageService.getImageUrl_nginx(product.productId)"
+      style="max-width: 100px; margin-left: 10px;"
+      alt="Product image"
+      (error)="onImageError($event)"
+    />
+  </mat-checkbox>
 </div>
+
 
 <!-- New Stock Section -->
 <div *ngIf="productService.newStock_component && yummyList.length > 0">
