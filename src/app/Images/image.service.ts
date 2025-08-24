@@ -42,13 +42,13 @@ export class ImageService implements OnInit {
         next:(value) => {
           
               
-              this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Successfully got ${environment.backend_get_endpoints.getProductList} Value: ${JSON.stringify(value)}`)
+              //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Successfully got ${environment.backend_get_endpoints.getProductList} Value: ${JSON.stringify(value)}`)
               this.productList = ResponseUtils.extractFirstArrayFromNested<ProductList>(value)
-              this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Assigned this.productList with Value: ${JSON.stringify(this.productList)}`)
+              //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Assigned this.productList with Value: ${JSON.stringify(this.productList)}`)
 
         },
         error:(err) => {
-                        this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} FAILED  got ${environment.backend_get_endpoints.getProductList} Value: ${JSON.stringify(err)}`)
+            // this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} FAILED  got ${environment.backend_get_endpoints.getProductList} Value: ${JSON.stringify(err)}`)
 
         },
         complete() {
@@ -60,7 +60,7 @@ export class ImageService implements OnInit {
   ngOnInit(): void {
 
     let className = 'ngOnInit'
-                  this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Initial ${environment.backend_get_endpoints.getProductList} `)
+        //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Initial ${environment.backend_get_endpoints.getProductList} `)
 
      }
  
@@ -124,12 +124,12 @@ getRedisProductImage_HTTP(productId: string) {
   } else if (typeof key === 'number') {
 
     keyNumber = key;
-    this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} now fetching key ${keyNumber} ${environment.backend_get_endpoints.getProductList} `)
+    //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} now fetching key ${keyNumber} ${environment.backend_get_endpoints.getProductList} `)
 
     url = this.getProductUrl(keyNumber);
 
-        this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Image url for ${url} `);
-        this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Dailing to Nginx on  ${url}`)
+        //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Image url for ${url} `);
+       // this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Dailing to Nginx on  ${url}`)
 
 
     return url;
@@ -156,17 +156,17 @@ return environment.expose_image.r2bucket_webp + "/" + key + ".webp";
   getProductUrl(productId:number): string{
     let className = 'getProductUrl'
     let url = 'Product0'
-    this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} now fetching Image url for Product[${productId}] on ${JSON.stringify(this.productList.length)}`)
+    //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} now fetching Image url for Product[${productId}] on ${JSON.stringify(this.productList.length)}`)
 
 if(!this.productList){
 
     }else if(this.productList.length > 0){
-    this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} all checks are true and ready to find Product[${productId}]`)
+    //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} all checks are true and ready to find Product[${productId}]`)
 
       for(let prod of this.productList){
 
         if(productId === prod.productId) {
-this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Successfully Found Image url for Product[${productId}]:${prod.image_url}`)
+  //this.metricsService.sendFrontendConsoleLog(this.global_Class_name,`${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-${className} Successfully Found Image url for Product[${productId}]:${prod.image_url}`)
 
           url = prod.productName +" "+ prod.productFlavor + ".webp";
           //let fullUrl = this.global_Class_name,`${environment.expose_image.r2bucket_png}/${url}`
@@ -239,7 +239,7 @@ getImageUrl(key: string): string {
   const cleanedKey = key.trim().replace(/\s+/g, '_'); // Or your filename convention
   const encodedKey = encodeURIComponent(cleanedKey);
   const imageUrl = `${this.baseUrl}/${encodedKey}`;
-  this.metricsService.sendFrontendConsoleLog(this.global_Class_name, `Fetching image from exposed nginx: ${imageUrl}`);
+ // this.metricsService.sendFrontendConsoleLog(this.global_Class_name, `Fetching image from exposed nginx: ${imageUrl}`);
   return imageUrl;
 }
 

@@ -79,7 +79,7 @@
         <ng-container *ngIf="editIndex === i; else viewGroup">
           <input [(ngModel)]="editedRow.itemGroup" class=""/>
         </ng-container>
-        <ng-template #viewGroup>{{ row.itemGroup }}</ng-template>
+        <ng-template #viewGroup>{{ row.itemGrouping }}</ng-template>
       </td>
     </ng-container>
 

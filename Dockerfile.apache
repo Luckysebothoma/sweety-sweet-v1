@@ -1,0 +1,12 @@
+# Stage 1: Build Angular app
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build -- --configuration production
+
+# Stage 2: Serve with Apache
+FROM httpd:alpine
+COPY --from=build /app/dist/sweety-sweet-app /usr/local/apache2/htdocs/
+EXPOSE 80
+CMD ["httpd-foreground"]

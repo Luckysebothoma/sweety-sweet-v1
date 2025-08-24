@@ -57,7 +57,6 @@ export class AuthInterceptorServiceInterceptor implements HttpInterceptor {
                 Authorization: `Bearer ${token}`,
                 'X-User-ID': user_details.user || 'anonymous' || 'anonymous',
                 'X-Correlation-ID': user_details.requestId,
-                
               }
             })
           : req;

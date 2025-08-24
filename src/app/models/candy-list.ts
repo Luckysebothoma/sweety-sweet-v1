@@ -131,7 +131,6 @@ export interface YummyList {
     productName:string;
     productFlavor:string;
     productPrice:number;
-
     productSize:number;
     productQuantity:number;
     costPerItem:number;
@@ -274,15 +273,7 @@ export interface AvailableItems{
 
 }
 
-
-
-/* 
-
-
-Copies
-
-
-*/
+ 
 export interface ProductList_Int_Copy {
 
     productId:number;

@@ -1,0 +1,24 @@
+# Stage 1: Build the Angular app
+FROM node:20-alpine AS build
+
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build -- --configuration production
+
+# Stage 2: Deploy to WildFly
+FROM quay.io/wildfly/wildfly:latest
+
+# Set deployment directory
+ENV DEPLOYMENT_DIR=/opt/jboss/wildfly/standalone/deployments
+
+# Copy Angular build as ROOT.war (so app runs at "/")
+RUN rm -rf $DEPLOYMENT_DIR/ROOT.war
+RUN rm -rf $DEPLOYMENT_DIR/ROOT
+COPY --from=build /app/dist/sweety-sweet-app $DEPLOYMENT_DIR/ROOT
+
+EXPOSE 8080
+  # WildFly Admin Console
+EXPOSE 9990
+
+CMD ["/opt/jboss/wildfly/bin/standalone.sh", "-b", "0.0.0.0"]

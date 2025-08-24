@@ -269,6 +269,7 @@
 <ng-template #ading_new>
   <div *ngIf="captureService.stockItemsState || captureService.addNewCandyState || captureService.editExistingCandyState || captureService.sod_eod_state">
     <app-add-new></app-add-new>
+    
     <div *ngIf="captureService.editExistingCandyState">
       <app-checkbox></app-checkbox>
       <app-edit-existing></app-edit-existing>

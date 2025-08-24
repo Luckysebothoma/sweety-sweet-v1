@@ -25,8 +25,6 @@ services:
       - "4200:80"
     container_name: sweety-app
     restart: unless-stopped
-#    command: npm start
-#    command: ng serve --host 0.0.0.0 --poll 2000
     environment:
       - TZ=Africa/Johannesburg
     networks:
@@ -36,11 +34,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /app/node_modules
-#      - /certs/crt.pem:/certs/cert.crt
-      - certs:/certs
-
-#      - /usr/src/app/node_modules  # prevents overwriting node_modules
-
+       - certs:/certs
 
   sweety-app-dev:
     build:
@@ -51,9 +45,7 @@ services:
     container_name: sweety-app-dev
     restart: unless-stopped
     mem_limit: 2000m
-    cpus: 0.5
-#    command: npm start
-#    command: ng serve --host 0.0.0.0 --poll 2000
+    cpus: 1
     environment:
       - TZ=Africa/Johannesburg
     networks:
@@ -63,8 +55,61 @@ services:
     volumes:
       - .:/usr/src/app
       - /app/node_modules
-#      - /certs/crt.pem:/certs/cert.crt
-      - certs:/certs
+       - certs:/certs
 
-#      - /usr/src/app/node_modules  # prevents overwriting node_modules
 
+  sweety-tomcat:
+    build:
+      context: .
+      dockerfile: Dockerfile.tomcat
+    container_name: sweety-tomcat
+    ports:
+      - "4201:8080"
+    networks:
+      - sweety-sweet-network-bridge
+      - sweety-sweet-tunnel
+      - node-exporter
+
+  sweety-wildfly:
+    build:
+      context: .
+      dockerfile: Dockerfile.wildfly
+    container_name: sweety-wildfly
+    ports:
+      - "4202:8080"
+      - "3000:9990"
+    restart: unless-stopped
+    networks:
+      - sweety-sweet-network-bridge
+      - sweety-sweet-tunnel
+      - node-exporter
+
+  sweety-apache:
+    build:
+      context: .
+      dockerfile: Dockerfile.apache
+    container_name: sweety-apache
+    ports:
+      - "4203:80"
+    restart: unless-stopped
+    networks:
+      - sweety-sweet-network-bridge
+      - sweety-sweet-tunnel
+      - node-exporter
+
+  # Load Balancer
+  sweety-haproxy:
+    image: haproxy:alpine
+    container_name: sweety-haproxy
+    restart: unless-stopped
+    ports:
+      - "4204:80"
+    volumes:
+      - certs:/etc/haproxy/certs:ro
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - sweety-wildfly
+      - sweety-tomcat
+    networks:
+      - sweety-sweet-tunnel
+      - node-exporter

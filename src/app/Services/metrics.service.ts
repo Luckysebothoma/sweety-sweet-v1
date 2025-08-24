@@ -57,7 +57,7 @@ export class MetricsService {
     return;
   }
 
-  sendFrontendConsoleLog(componentName: string, value: string) {
+  sendFrontendConsoleLogs(componentName: string, value: string) {
     if (!value ) {
       console.error('❌ Invalid log format. Expected a string.');
       return;
@@ -79,10 +79,10 @@ export class MetricsService {
   sendFrontendErrors(componentName: string, value: string) {
     const start = new Date();
 
-    this.sendFrontendConsoleLog(`Sending frontend error: ${componentName} with value: ${value} at ${start.toISOString()}`, value);
+    this.sendFrontendConsoleLogs(`Sending frontend error: ${componentName} with value: ${value} at ${start.toISOString()}`, value);
     this.sendFrontendError(componentName, value);
     const end = new Date();
-    this.sendFrontendConsoleLog(`Finished sending frontend error at ${end.toISOString()}. Duration: ${end.getTime() - start.getTime()}ms`, '');
+    this.sendFrontendConsoleLogs(`Finished sending frontend error at ${end.toISOString()}. Duration: ${end.getTime() - start.getTime()}ms`, '');
   
   }
 

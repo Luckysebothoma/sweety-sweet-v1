@@ -1,0 +1,14 @@
+# escape=`
+
+# Stage 1: Build Angular app
+FROM node:20-nanoserver AS build
+WORKDIR C:\app
+COPY . .
+RUN npm install
+RUN npm run build -- --configuration production
+
+# Stage 2: Serve with IIS
+FROM mcr.microsoft.com/windows/servercore/iis
+WORKDIR C:\inetpub\wwwroot
+COPY --from=build C:\app\dist\sweety-sweet-app\ .
+EXPOSE 80

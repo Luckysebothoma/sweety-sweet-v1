@@ -77,7 +77,7 @@ export class YummyListTableComponent implements AfterViewInit {
       const yummyList = this.productService.createYummyListArray(flatProductList, flatProductPricing);
 
       this.dataSourceYummylist.data = yummyList;
-      console.log("✅ YummyList created:", yummyList);
+      console.log("✅ YummyList created:", yummyList); 
       this.dataSourceYummylist.paginator = this.paginator;
     });
   });

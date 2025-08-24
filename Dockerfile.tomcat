@@ -1,0 +1,15 @@
+# Stage 1: Build Angular app
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm install
+RUN npm run build -- --configuration production
+RUN apk add --no-cache zip && \
+    cd dist/sweety-sweet-app && \
+    zip -r /app/ROOT.war .
+
+# Stage 2: Deploy to Tomcat
+FROM tomcat:9-jdk11-openjdk-slim
+COPY --from=build /app/ROOT.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+CMD ["catalina.sh", "run"]
