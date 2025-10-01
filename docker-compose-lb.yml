@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Nginx Load Balancer with health checks
+  sweety-loadbalancer:
+    image: nginx:alpine
+    container_name: sweety-loadbalancer
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Admin/stats port
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./html:/usr/share/nginx/html:ro
+    depends_on:
+      sweety-app:
+        condition: service_healthy
+      sweety-tomcat:
+        condition: service_healthy
+      sweety-wildfly:
+        condition: service_healthy
+      sweety-apache:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # App backends with health checks
+  sweety-app:
+    image: nginx:alpine
+    container_name: sweety-app
+    expose:
+      - "80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  sweety-tomcat:
+    image: tomcat:10-jdk17
+    container_name: sweety-tomcat
+    expose:
+      - "8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  sweety-wildfly:
+    image: quay.io/wildfly/wildfly:latest
+    container_name: sweety-wildfly
+    expose:
+      - "8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  sweety-apache:
+    image: httpd:alpine
+    container_name: sweety-apache
+    expose:
+      - "80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
