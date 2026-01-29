@@ -64,3 +64,6 @@ coverage/
 up/
 .deleted/
 *.log
+node_modules
+dist
+.cache
