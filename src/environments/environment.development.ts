@@ -17,14 +17,14 @@ export const environment = {
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-            local_images:"https://expose_images.justdo-it.uk/local_images"
+            local_images:"https://192.168.0.140:3007/local_images"
 
     },cloudflare_proxy:{
-      webp:"https://expose_images.justdo-it.uk/webp",
-      loader:"https://expose_images.justdo-it.uk/loader" 
+      webp:"https://192.168.0.140:3007/webp",
+      loader:"https://192.168.0.140:3007/loader" 
 
     },
-        expose_image_gif:"https://expose_images.justdo-it.uk/images/gif",
+        expose_image_gif:"https://192.168.0.140:3007/images/gif",
 
 	  nodejs:{
         full_api_path:'https://192.168.0.140:8183/api/v1/student',
