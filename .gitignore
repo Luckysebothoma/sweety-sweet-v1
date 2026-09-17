@@ -7,7 +7,7 @@ core
 .jpg
 # Node.js dependencies
 node_modules/
-.angular/
+*.angular/
 
 *.env*
 
