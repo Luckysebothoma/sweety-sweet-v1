@@ -9,7 +9,7 @@ core
 node_modules/
 .angular/
 
-
+*.env*
 
 #certs
 .pem
