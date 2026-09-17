@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "4200:80"
+      - "4210:80"
       - "4230:443"
     container_name: sweety-app
     restart: unless-stopped
@@ -21,7 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "4210:4200"
+      - "4200:4200"
     container_name: sweety-app-dev
     restart: unless-stopped
     mem_limit: 2000m
@@ -31,7 +31,7 @@ services:
     volumes:
       - .:/usr/src/app
       - /app/node_modules
-      - /mnt/app/certs/certs:/certs
+      - /mnt/app/certs/certs:/certs:ro
 
 
   sweety-tomcat:
@@ -48,7 +48,7 @@ services:
     container_name: sweety-wildfly
     ports:
       - "4202:8080"
-      - "3013:9990"
+      - "3018:9990"
     restart: unless-stopped
   sweety-apache:
     build:

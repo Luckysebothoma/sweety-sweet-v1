@@ -67,3 +67,9 @@ up/
 node_modules
 dist
 .cache
+node_modules/node/node_modules/node-linux-x64/bin/node
+node_modules/node/bin/node
+node_modules/workerd/bin/workerd
+node_modules/@cloudflare/workerd-linux-64/bin/workerd
+.angular/cache/18.2.20/angular-webpack/0463eb84adb31d7ad7e3ea68affdfa009bc67c44/1.pack
+.angular/cache/18.2.20/angular-webpack/f652491b0cbe753cfa32569b606ac7b3c885eb30/0.pack

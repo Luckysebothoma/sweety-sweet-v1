@@ -1,10 +1,10 @@
 
 export const environment = {
 	production: true,
-//	apiUrl: 'https://node-js.justdo-it.uk'
+//	apiUrl: 'https://192.168.0.140:8183'
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
-	apiUrl: 'https://node-js.justdo-it.uk',
+	apiUrl: 'https://192.168.0.140:8183',
 	redisPostgres:"https://redisPostgres.justdo-it.uk",
 	auth:{ 
         domain: 'dev-3ocho460qagqipds.us.auth0.com',
@@ -12,7 +12,7 @@ export const environment = {
         audience:'https://linux.justdo-it.local:8083'
     },cloudflare_proxy:{
       webp:"https://expose_images.justdo-it.uk/webp",
-      loader:"https://expose_images.justdo-it.uk/loader" 
+      loader:"https://expose_images.justdo-it.uk/loader"
     },
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
@@ -21,7 +21,7 @@ export const environment = {
     },
     expose_image_gif:"https://expose_images.justdo-it.uk/images/gif",
 	  nodejs:{
-        full_api_path:'https://node-js.justdo-it.uk/api/v1/student',
+        full_api_path:'https://192.168.0.140:8183/api/v1/student',
     },
     backend_endpoints:{
         addPriceTracing:'addPriceTracing',
@@ -54,7 +54,7 @@ export const metrics ={
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
     monitoring: {
-        server: 'https://node-js.justdo-it.uk',
+        server: 'https://192.168.0.140:8183',
         frontendConsoleEndpoint: '/frontend-console-log',
         frontendErrorEndpoint: '/frontend-error',
         frontendMetricsEndpoint: '/frontend-metrics',
@@ -64,9 +64,9 @@ export const metrics ={
     },
     frontEndFullUrl: {
         
-        frontendConsoleUrl: 'https://node-js.justdo-it.uk/frontend-console-log',
-        frontendErrorUrl: 'https://node-js.justdo-it.uk/frontend-error',
-        frontendMetricsUrl: 'https://node-js.justdo-it.uk/frontend-metrics'
+        frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
+        frontendErrorUrl: 'https://192.168.0.140:8183/frontend-error',
+        frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics'
 
     }
 }

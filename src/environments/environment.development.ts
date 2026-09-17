@@ -5,7 +5,7 @@ export const environment = {
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
 //	apiUrl: 'https:/node-js.justdo-it.uk'
-	apiUrl: 'https://node-js.justdo-it.uk',
+	apiUrl: 'https://192.168.0.140:8183',
 
 	redisPostgres:"https://redisPostgres.justdo-it.uk",
 	auth:{ 
@@ -27,7 +27,7 @@ export const environment = {
         expose_image_gif:"https://expose_images.justdo-it.uk/images/gif",
 
 	  nodejs:{
-        full_api_path:'https://node-js.justdo-it.uk/api/v1/student',
+        full_api_path:'https://192.168.0.140:8183/api/v1/student',
     },
     backend_endpoints:{
         addPriceTracing:'addPriceTracing',
@@ -56,7 +56,7 @@ export const environment = {
  
 export const metrics = {
   monitoring: {
-    server: 'https://node-js.justdo-it.uk', // 🔧 Replace with process.env or override during deployment
+    server: 'https://192.168.0.140:8183', // 🔧 Replace with process.env or override during deployment
     frontendConsoleEndpoint: '/frontend-console-log',
     frontendErrorEndpoint: '/frontend-error',
     frontendMetricsEndpoint: '/frontend-metrics',
@@ -66,9 +66,9 @@ export const metrics = {
     frontendConsoleUrl: '/frontend-console-log',
   },
   frontEndFullUrl: {
-    frontendConsoleUrl: 'https:/node-js.justdo-it.uk/frontend-console-log',
-    frontendErrorUrl: 'https:/node-js.justdo-it.uk/frontend-error',
-    frontendMetricsUrl: 'https:/node-js.justdo-it.uk/frontend-metrics',
+    frontendConsoleUrl: 'https://192.168.0.140:8183frontend-console-log',
+    frontendErrorUrl: 'https://192.168.0.140:8183frontend-error',
+    frontendMetricsUrl: 'https://192.168.0.140:8183frontend-metrics',
  
 
   }

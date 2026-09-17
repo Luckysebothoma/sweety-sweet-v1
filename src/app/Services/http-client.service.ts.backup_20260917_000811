@@ -122,7 +122,7 @@ return this.http.post(`${fillUrl}`, formData);
    */
   getTempImageByKey(key: string): Observable<Blob> {
   const encodedKey = encodeURIComponent(key); // Encode special characters like ":"
-  return this.http.get(`${environment.apiUrl}/images/temp?key=${encodedKey}`, {
+  return this.http.get(`${environment.apiUrl}/temp?key=${encodedKey}`, {
     responseType: 'blob'
   });
 }

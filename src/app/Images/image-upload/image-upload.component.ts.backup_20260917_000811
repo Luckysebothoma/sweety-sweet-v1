@@ -18,7 +18,7 @@ import { NewProductList } from 'src/app/models/candy-list';
   styleUrls: ['./image-upload.component.css']
 })
 export class ImageUploadComponent {
-  uploadUrl = environment.apiUrl + '/'; // Adjust with your Nginx URL
+  uploadUrl = 'https://nodejs.justdo-it.uk/'; // Adjust with your Nginx URL
 
   constructor(private http: HttpClient, public productService: ProductService,
     public captureServices: CaptureService,
@@ -247,7 +247,7 @@ export class ImageUploadComponent {
           this.productService.selectedFiles[i] + "this.selectedFiles[i].name" + this.productService.selectedFiles[i].name);
         formData.append('images', this.productService.selectedFiles[i], this.productService.selectedFiles[i].name);
       }
-      this.http.post(environment.apiUrl + '/upload', formData).subscribe(
+      this.http.post("https://nodejs.justdo-it.uk" + '/upload', this.productService.selectedFiles[0]).subscribe(
         (response) => {
           this.productService.message = 'Images uploaded successfully!';
           this.imageUploadService.clearPreview(); // Clear preview after successful upload
