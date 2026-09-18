@@ -6,9 +6,9 @@
     <div *ngFor="let key of imageService.imageKeys" class="">
       <div class="">
         <img 
-            [src]="imageService.expose + '/Product_' + key + '.jpg'" 
+            [src]="imageService.imageUrl + '/Product_' + key + '.jpg'" 
             [alt]="key" 
-            (error)="imageService.handleImageError($event)" 
+            (error)="imageService.onImageError($event)" 
             class=""
             />
 

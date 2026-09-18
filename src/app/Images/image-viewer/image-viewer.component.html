@@ -11,7 +11,7 @@
       <img 
         [src]="imageService.imageSrc"
         [alt]="key"
-        (error)="imageService.handleImageError($event)"
+        (error)="imageService.onImageError($event)"
         class="gallery-image"
       />
     </div>

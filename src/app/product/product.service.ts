@@ -1,2917 +1,962 @@
 import { Injectable } from '@angular/core';
 import { environment } from 'src/environments/environment';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable, catchError, concatMap, forkJoin, from, lastValueFrom, map, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, concatMap, defer, finalize, forkJoin, map, of, tap, throwError } from 'rxjs';
 import { Product } from '../models/product';
-import {DataTransformer} from "../Class/Data-Transformer/data-transformer"
 
-import { ResponseUtils } from '../Services/response-utils';
 import { Calendar2024 } from '../Class/Calender/calendar2024';
 import { ApiResponseTransformService } from '../Services/api-response-transform.service';
 import { ProductList, productPricing } from '../capture/capture-view/models/candy-list';
-import { AddNewStock, ApiResponse, AvailableItems, CheckboxIndex, EstimatedPricing, Login, MatTableSOD_EOD, PriceTracing, ProductItemPricing, ProductList_Int_Copy, ProductPricing, SOD_EOD, StockItems, StockedItems, Tracer, YummyList, api } from '../models/candy-list';
+import { AddNewStock, ApiResponse, AvailableItems, CheckboxIndex, EstimatedPricing, Login, MatTableSOD_EOD, PriceTracing, ProductItemPricing, ProductPricing, SOD_EOD, StockItems, StockedItems, Tracer, YummyList, api } from '../models/candy-list';
 import { MatTableDataSource } from '@angular/material/table';
-import { MatSnackBar } from '@angular/material/snack-bar'; 
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { AuthService } from '@auth0/auth0-angular';
- import { LoaderBounceService } from '../iframe/loader-bounce.service';
- import { HttpClientService } from '../Services/http-client.service';
+import { LoaderBounceService } from '../iframe/loader-bounce.service';
+import { HttpClientService } from '../Services/http-client.service';
 import { DateTimeService } from '../Services/date-time.service';
-import {PricingConverter} from "../Class/Converter/PricingConverter"
-import { ImageService } from '../Images/image.service';
+import { PricingConverter } from '../Class/Converter/PricingConverter';
 import { DataArrayTransformerService } from '../Services/data-array-transformer.service';
-import { consumerPollProducersForChange } from '@angular/core/primitives/signals';
-import { ThisReceiver } from '@angular/compiler';
-      
- 
+
+/*
+ * REMOVED IMPORTS (bug #1):
+ *   - consumerPollProducersForChange from '@angular/core/primitives/signals'  (private Angular API, accidental auto-import)
+ *   - ThisReceiver from '@angular/compiler'                                    (drags the whole compiler into the bundle)
+ *   - DataTransformer, ImageService, ResponseUtils (unused now)
+ *
+ * "FIX #n" comments refer to the numbered list in the review notes.
+ */
 
 @Injectable({
   providedIn: 'root'
 })
 export class ProductService {
-  getProductCostPerItem(productId: number):number {
 
-    let costp =-1;
+  // ───────────────────────────── config ─────────────────────────────
+  /** Flip to true to get the verbose logging the old version always printed. */
+  private readonly debug = false;
+  /** Was a magic `0.3` inside debitCreditAvailableItems. */
+  private readonly SHOP_COMMISSION_RATE = 0.3;
 
-    if(this.yummyList.length > 0){
+  private path = '/api/v1/student/';
+  apiUrl = environment.apiUrl + this.path;
+  selectedDate: Date = new Date();
 
-      for(let p of this.yummyList){
+  // FIX #6: the old shared mutable `fullApiUrl` field is gone. It was overwritten by every method
+  // (some even set it to a bare "removeStockedItems"), and debitCreditAvailableItems later built
+  // URLs from whatever value happened to be left in it.
+  private url(p: string): string {
+    return this.apiUrl + p;
+  }
 
-        if(p.productId === productId){
-
-          return p.costPerItem;
-        }
-
-      }
-
-    }else{
-      console.log(`YUmmyList Is empty`)
+  private dbg(...args: any[]): void {
+    if (this.debug) {
+      console.log(this.dateTimeService.formatPartial(Date.now()), ...args);
     }
+  }
 
-
-    return costp;
-  } 
-
-
-
-
+  // ───────────────────────────── form fields (unchanged public API) ─────────────────────────────
   form_productFlavor: string | null | undefined;
   form_productName: string | null | undefined;
   form_productPrice: string | null | undefined;
   form_productQuantity: string | null | undefined;
-
-  private path = "/api/v1/student/";
-  apiUrl = environment.apiUrl + this.path;
-  private fullApiUrl = environment.apiUrl + "/api/v1/student";
-  selectedDate: Date = new Date();
- 
-
-  private readonly endpoints = {
-    apigetProductItemPricing: this.apiUrl + "getProductItemPricing",
-    apivalidateUser: this.apiUrl + "validateUser",
-    apiapiaddProduct: this.apiUrl + "addProduct",
-    apiaddProductItemPricing: this.apiUrl + "addProductItemPricing",
-    apiupdateProductPricing: this.apiUrl + "updateProductPricing",
-    apiupdateProductItemPricing: this.apiUrl + "updateProductItemPricing",
-    apiupdateYummyList: this.apiUrl + "updatePricingList",
-    apigetProductList: this.apiUrl + "getProductList",
-    apigetSodEodItems: this.apiUrl + "getSodEodItems",
-    apigetSodEodList: this.apiUrl + "getSodEodList",
-    apigetProductPricing: this.apiUrl + "getallpricing",
-    apiaddSodEodItems: this.apiUrl + "addSodEodItems",
-    apiupdateSodEodItems: this.apiUrl + "updateSodEodItems",
-    apideleteProduct: this.apiUrl + "deleteProduct",
-    apiremoveStockItems: this.apiUrl + "removeStockItems",
-    apiremoveStockedItems: this.apiUrl + "removeStockedItems",
-    apiremoveProductItemPricing: this.apiUrl + "removeProductItemPricing",
-    apiremovePriceTracing: this.apiUrl + "removePriceTracing",
-    apiremoveEstimateById: this.apiUrl + "removeEstimateById",
-    apiremoveAvailableItemsById: this.apiUrl + "removeAvailableItemsById",
-    apiremoveSodEodById: this.apiUrl + "removeSodEodById",
-    apiaddStock: this.apiUrl + "addStock",
-    apiaddStockedItems: this.apiUrl + "addStockedItems",
-    apiupdateAvailableItems: this.apiUrl + "updateAvailableItems",
-    apiaddAvailableItems: this.apiUrl + "addAvailableItems",
-    apigetAvailableItems: this.apiUrl + "getallAvailableItems",
-    apigetPriceTracing: this.apiUrl + "getPriceTracing",
-    apiaddPriceTracing: this.apiUrl + "addPriceTracing",
-    apigetEstimates: this.apiUrl + "getEstimates",
-    apiupdateEstimates: this.apiUrl + "updateEstimates",
-    apiaddEstimates: this.apiUrl + "addEstimates",
-    apiuploadImages: this.apiUrl + "upload",
-    apigetImages: this.apiUrl + "getImages",
-    apigetImagesById: this.apiUrl + "getImages",
-  };
   form_productSize: string | null | undefined;
-  yummyList: YummyList[] =[];
 
-  clearMatTable() {
+  yummyList: YummyList[] = [];
 
-    console.log(this.dateTimeService.formatPartial(Date.now()) +"dataSourceSodEod Table Cleared ")
-    this.dataSourceSodEod.data.splice(0);
-   // this.stockView.clearStock_MatTable();
+  // ───────────────────────────── state subjects ─────────────────────────────
+  public productPricing$ = new BehaviorSubject<any[]>([]);
+  public productList$ = new BehaviorSubject<ProductList[]>([]);
+  public productEstimates$ = new BehaviorSubject<any[]>([]);
+  public productPriceTracing$ = new BehaviorSubject<any[]>([]);
+  public availableItems$ = new BehaviorSubject<any[]>([]);
+  public sodEodList$ = new BehaviorSubject<any[]>([]);
+  public productItemPricing$ = new BehaviorSubject<any[]>([]);
+  public universalNextProductId$ = new BehaviorSubject<number>(-1);
 
-  }
-sendNewStockItems() {
+  sourceOfTruth = {
+    productList: this.productList$,
+    availableItems: this.availableItems$,
+    productEstimates: this.productEstimates$,
+    productItemPricing: this.productItemPricing$,
+    sodEodList: this.sodEodList$,
+    productPriceTracing: this.productPriceTracing$,
+    productPricing: this.productPricing$,
+  };
 
+  // ───────────────────────────── component state ─────────────────────────────
+  productListToShowOnCheckBox: MatTableSOD_EOD[] = [];
+  productListOnStock: MatTableSOD_EOD[] = [];
+  stockAvailability: MatTableSOD_EOD[] = [];
+  productListOutOfStock: MatTableSOD_EOD[] = [];
+  productListUnCaptured: MatTableSOD_EOD[] = [];
+  newStockMatTable: AddNewStock[] = [];
+  checkedProductList: ProductList[] = [];
 
-  
-// console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending New Stock Item" + this.stockView.dataSourceStockPreview.data.slice())
-// console.log(this.dateTimeService.formatPartial(Date.now()) + ": this.stockView.dataSourceStockPreview.data.slice() ", this.stockView.dataSourceStockPreview.data.slice());
-//this.finalizeNewStock(this.stockView.dataSourceStockPreview.data.slice());
+  labelAvailability: number = 0;
+  sod_eod_tableData: SOD_EOD[] = [];
+  newStock_tableDate: StockItems[] = [];
+  newStock_list: StockItems[] = [];
+  sod_eod_list: SOD_EOD[] = [];
+  availableItems: AvailableItems[] = [];
+  availableItemsToDisplay: number = 0;
+  productList: ProductList[] = [];
 
+  snackBarDuration_Success = 10000; // 10 seconds
+  snackBarDuration_Failure = 15000; // 15 seconds
 
-}
+  priceEstimates: EstimatedPricing[] = [];
+  productItemPricingList: ProductItemPricing[] = [];
+  priceTracingList: PriceTracing[] = [];
+  DatabaseData: any;
 
-
-getProductItemsRemaining(_productId:number):number{
-
-  let itemsRemaning = -1;
-
-  if(this.availableItems.length > 0 ){
-
-    for(let avail of this.availableItems){
-
-      itemsRemaning = avail.itemsRemaining;
-    }    
-
-  }else{
-console.log(`getProductItemsRemaining return empty`)
-  }
-
-return itemsRemaning;
-}
-  newStock_component: Boolean = false;  
+  dailyOpsRequest: Boolean = false;
+  sod_eod_component: Boolean = false;
+  newStock_component: Boolean = false;
   token: any;
-  nextProductId_universal:number=0;
-  
-  
-  /*
-  addNewCandy_test(addProductRequest:ProductList, addYummyRequest: YummyList, addAvailableItems: AvailableItems, addPriceTracing: PriceTracing) {
-    const body = {
-      addProductRequest,
-      addYummyRequest,
-      addAvailableItems,
-      addPriceTracing
-    };
+  nextProductId_universal: number = 0;
 
-    this.fullApiUrl = this.apiUrl + "addNewCandy";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Adding New Cady to the list -> " + this.fullApiUrl + body);
+  outOfStockPressed: Boolean = false;
+  availableStockPressed: Boolean = false;
 
-  }
-*/
+  previewSOD_EOD: boolean = false;
+  previewNewStock: boolean = false;
+  checkboxSpinner: boolean = false;
+  sodEodDbFound: boolean = false;
+  calenderClicked: boolean = false;
+  ClickedCalenderDate: Date;          // initialised in the constructor (FIX #25)
 
-  addNewCandy(addProductListRequest: ProductList, addProductPricingRequest: ProductPricing, 
-    addAvailableItemsRequest: AvailableItems, addPriceTracing: PriceTracing){
-     
-    this.fullApiUrl = this.apiUrl + "addNewCandy";
-      const body = {
-        addProductListRequest,
-        addProductPricingRequest,
-        addAvailableItemsRequest,
-        addPriceTracing
-      };
-      return this.http.post( this.fullApiUrl , body);
-   
-    }
+  loadDataButtonState: Boolean = false;
+  loadSpinner: boolean = false;
 
-  addNewCandy_with_image(addProductListRequest:ProductList, addProductPricingRequest: ProductPricing, 
-              addAvailableItemsRequest: AvailableItems, addPriceTracing: PriceTracing, formData: FormData){
-     
-    this.fullApiUrl = this.apiUrl + "addNewCandy_with_image";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": addNewCandy_with_image Triggered: ")
-      const body = {
-        addProductListRequest,
-        addProductPricingRequest,
-        addAvailableItemsRequest,
-        addPriceTracing,
-        formData
-      };
-      return this.http.post( this.fullApiUrl , body);
-   
-    }
-  
+  priceTracingFound: boolean = false;
+  availableItemFound: boolean = false;
 
-    // 💾 State Subjects
-public productPricing$ = new BehaviorSubject<any[]>([]);
-public productList$ = new BehaviorSubject<ProductList[]>([]);
-public productEstimates$ = new BehaviorSubject<any[]>([]);
-public productPriceTracing$ = new BehaviorSubject<any[]>([]);
-public availableItems$ = new BehaviorSubject<any[]>([]);
-public sodEodList$ = new BehaviorSubject<any[]>([]);
-public productItemPricing$ = new BehaviorSubject<any[]>([]);
-public universalNextProductId$ = new BehaviorSubject<number>(-1);
+  uploadMessage: string = '';
 
-
-
-      sourceOfTruth = {
-      productList: this.productList$,
-      availableItems:this.availableItems$,
-      productEstimates:this.productEstimates$,
-      productItemPricing:this.productItemPricing$,
-      sodEodList:this.sodEodList$,
-      productPriceTracing:this.productPriceTracing$,
-      productPricing:this.productPricing$,
-    }
-
-
-  productListToShowOnCheckBox: MatTableSOD_EOD[]=[];
-
-
-  productListOnStock: MatTableSOD_EOD[] =[];
-  stockAvailability: MatTableSOD_EOD[] =[];
-  productListOutOfStock: MatTableSOD_EOD[] =[];
-  productListUnCaptured: MatTableSOD_EOD[] =[];
-
-  newStockMatTable: AddNewStock[] =[];
-
-  
- checkedProductList : ProductList[]=[];
-
-labelAvailability:number=0;
-sod_eod_tableData:SOD_EOD[]=[];
-newStock_tableDate:StockItems[] =[];
-newStock_list: StockItems[]=[];
-sod_eod_list:SOD_EOD[]=[];
-availableItems:AvailableItems[]=[];
-availableItemsToDisplay:number=0;
-productList: ProductList[] =[];
-
-snackBarDuration_Success= 10000; // 10 Seonds
-snackBarDuration_Failure= 15000; // 10 Seonds
-
-priceEstimates:EstimatedPricing [] = [];
-productItemPricingList: ProductItemPricing[]=[];
-priceTracingList:PriceTracing[]=[];
-DatabaseData :any;
-
-dailyOpsRequest:Boolean= false;
-sod_eod_component:Boolean = false;
-
-//////
-
-outOfStockPressed : Boolean= false;
-availableStockPressed : Boolean= false;
-
-previewSOD_EOD:boolean=false;
-previewNewStock:boolean=false;
-checkboxSpinner:boolean=false;
-sodEodDbFound:boolean= false;
-calenderClicked:boolean=false;
-ClickedCalenderDate:Date=this.dateTimeService.normalizeDate(new Date());
-
-loadDataButtonState:Boolean= false;
-
-loadSpinner:boolean= false;
-
-priceTracingFound:boolean=false;
-availableItemFound:boolean =false;
-
-uploadMessage:string='';
-
-  
-  
-  
-
-  productPricingList: ProductPricing[]=[];
-  overViewList: YummyList[]=[];
+  productPricingList: ProductPricing[] = [];
+  overViewList: YummyList[] = [];
 
   displayedColumns: string[] = ['productName', 'productFlavor', 'productPrice', 'image_url'];
+  displayedColumns_AddNew: string[] = ['productPack', 'productName', 'productSize', 'productQuantity', 'productPrice'];
 
-  displayedColumns_AddNew: string[] = ['productPack','productName', 'productSize', 'productQuantity', 'productPrice'];
-  
-  
   selectedProducts = new MatTableDataSource<MatTableSOD_EOD>([]);
-  checkBoxSelectedProducts_AddNew = new MatTableDataSource<AddNewStock>([])
-  
-  
-  checkBoxSelectedProducts : MatTableSOD_EOD[]=[];
-
-
-  addProductItemPricing(_productItemPricingList:ProductItemPricing) {
-
-    this.addProductItemPricing_HTTP(_productItemPricingList).subscribe(
-      response => {
-        const msg = "SUccessufyll added ProductItemPricing"
-        this.showSuccess(msg);
-
-      }, error =>{
-        this.showError(error)
-      }
-    )
-
-  }
-
-getProductItemPricing() {
-
-  this.getProductItemPricing_HTTP().subscribe(
-    response => {
-      this.showSuccess("getProductItemPricing" + response)
-    }, error=> {
-      this.showError("Error in getProductItemPricing \n" + error)
-    }
-  )
-}
-
-productListToShowOnCheckBox_AddNew: any[]=[];
-//productListToShowOnCheckBox_newStock: YummyList[] = []
-productPricingOnCheckBox_newStock: ProductPricing[]=[];
-  groupNumber: number =1;
-
-clearMatTableSodEod() {
-
-this.checkedItems.splice(0); // Clear Object
-
-
-}
-
-createProductPricing(someList:MatTableSOD_EOD[]): ProductPricing[]{
-  
-  let product: ProductPricing[]=[];
-  
-
-  if(someList.length > 0 && this.productPricingList){
-    for( let listToCapture of someList ){
-        for(let pricing of this.productPricingList){
-           if(pricing.productId === listToCapture.productId){
-
-              product.push(pricing);
-              console.log("dONE Pushing ProductId["+pricing.productId +"]" )
-           }
-        }
-  }
-
-  }
-  
-  return product;
-
-}
-
-ShowUnCaptured() {
-
-  this.productPricingOnCheckBox_newStock.splice(0)
-  this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListUnCaptured)
-
-/*
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": ShowUnCaptured: " + this.productListUnCaptured);
-this.checkedItems.splice(0); // Clear Object
-
-
-if(this.newStock_component){
-  console.log("Capturing productListUnCaptured")
-  this.productListToShowOnCheckBox_AddNew = this.createProductPricing(this.productListUnCaptured);
-  return;
-}
-
-
-this.productListToShowOnCheckBox_AddNew = this.productListUnCaptured;
-
-console.log(this.dateTimeService.formatPartial(Date.now()) + ": productListToShowOnCheckBox_AddNew: " + this.productListToShowOnCheckBox_AddNew);
-*/
-}
-
-outOfStockOnly():void {
-
-
-    this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListUnCaptured)
-
-  //this.checkBoxSelectedProducts.data.splice(0);
-  //this.checkBoxSelectedProducts.data= [...this.checkBoxSelectedProducts.data];
-/*  this.productListToShowOnCheckBox = this.productListOutOfStock;
-
-    if(this.newStock_component){
-      console.log("Capturing productListOutOfStock")
-      this.productListToShowOnCheckBox_AddNew = this.createProductPricing(this.productListOutOfStock);
-      return;
-    }
-
-  if(this.sod_eod_component){
-    // Do nothing , actuallt clear staff
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": TIme to add  0 only out of stock on checkbox")
-
-  }else if(this.newStock_component){
-
-
-    this.checkedItems.splice(0); // Clear Object
-    this.productListToShowOnCheckBox_AddNew = this.productListOutOfStock;
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Out Of sTOCK", this.productListOutOfStock);
-
-  }else{
-
-  }
-*/
-
-}
-
-
-AvailableStockOnly():void {
-
- // this.checkBoxSelectedProducts.data.splice(0);
- // this.checkBoxSelectedProducts.data= [...this.checkBoxSelectedProducts.data];
- // this.productListToShowOnCheckBox = this.stockAvailability;
-
- console.log("Assigning Available Stock Only")
-     this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListOnStock)
-      console.log("DOne Assigning Available Stock Only", console.table(this.productPricingOnCheckBox_newStock))
-
-/*
-    if(this.newStock_component){
-      console.log("Capturing productListOnStock");
-      
-      this.productListToShowOnCheckBox_AddNew = this.createProductPricing(this.productListOnStock);
-      return;
-    }
-
-if(this.sod_eod_component){
-  //aval stock
-
-  if(!this.availableStockPressed){
-    this.checkBoxSelectedProducts = [];
-    this.productListToShowOnCheckBox_AddNew = [];
-  
-    this.productListToShowOnCheckBox_AddNew = this.productListOnStock;
-    this.productListOnStock= [];
-    this.productListOutOfStock = [];
-  
-    this.checkedItems.splice(0); // Clear Object
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Available stock this.productListToShowOnCheckBox_AddNew =>",this.productListToShowOnCheckBox_AddNew );
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Available stock this.productListOnStock =>",this.productListOnStock );
-    this.availableStockPressed = true;
-    let count:number=1;
-    for(let product of this.productListToShowOnCheckBox_AddNew){
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Adding to checkedItems count: "+count+"\n", product);
-
-      if(product.outOfStock==true){
-        this.productListOutOfStock.push(product);
-      }else{
-        this.productListOnStock.push(product);
-      }
-      count++;
-    }
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Available Stock Only this.productListOnStock =>",this.productListOnStock );
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Available Stock Only this.productListOutOfStock =>",this.productListOutOfStock );
-    
-  }else{
-
-    this.checkBoxSelectedProducts = [];
-    this.productListToShowOnCheckBox_AddNew = [];
-    this.availableStockPressed = false;
-  }
-
-
-
-}else if(this.newStock_component){
-
-  this.checkBoxSelectedProducts.splice(0);
-
-
-  this.checkedItems.splice(0); // Clear Object
-  this.productListToShowOnCheckBox_AddNew = this.productListOnStock;
-    console.log(this.dateTimeService.formatPartial(Date.now()) + ": Showing Only stockAvailability",this.stockAvailability);
-    console.log(this.dateTimeService.formatPartial(Date.now()) + ": Showing Only productListOnStock",this.productListOnStock);
-
-}else{
-
-}
-*/
-
-}
-
-createProductList():void{
-
-}
-
-ShowAll() {
-
-this.productPricingOnCheckBox_newStock = this.createProductPricing(this.stockAvailability)
-
-/*
-// Push new Data to the checkBox but changing the PorductList Variable
-this.checkedItems.splice(0); // Clear Object
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": Show all", this.productList);
-this.productListToShowOnCheckBox_AddNew = this.productList;
-*/
-}
-
-  createAvailableItem(productYummy: YummyList) {
-
-    let _availableItems: AvailableItems ={
-        productId:productYummy.productId,
-        itemsRemaining: productYummy.productQuantity,
-        lastUpdated: this.dateTimeService.normalizeDate((new Date()).toString())
-    }
-    return _availableItems;
-
-  }
-
-  
- 
-  createYummyListArray(_productList:ProductList[], _productPricing: ProductPricing[]):YummyList[]{
-
-    
-    let yummyList : YummyList[]=[]
-      for(let pPricing of _productPricing ){
-
-        for(let pList of _productList){
-
-            if( pList.productId === pPricing.productId) {
-                 console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now creating Product Id[" + pList.productId+"] ", pList);
-                yummyList.push(this.createYummyList(pList,pPricing ))
-                 console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done creating Product Id[" + pList.productId+"] yummylist", yummyList);
-
-            }
-
-        }
-
-      }
-    return yummyList;
-  }
-
-  createYummyList(productList: ProductList, productPricing: ProductPricing):YummyList{
-
-     console.log(`${this.dateTimeService.formatPartial(Date.now())} : Creating YummyList ProductList -> ${JSON.stringify(productList)} -> ${JSON.stringify(productPricing)}`)
-  
-  const yummyItem: YummyList = {
-    productId: productList.productId,
-    productName: productList.productName,
-    productFlavor: productList.productFlavor,
-    productPrice: productList.productPrice,
-    productSize: productPricing.productSize,
-    productQuantity: productPricing.productQuantity,
-    costPerItem: productPricing.costPerItem,
-    productProfit: productPricing.productProfit,
-    sellingPrice: productPricing.sellingPrice,
-    productCommission: productPricing.productCommission,
-    itemGrouping: productPricing.itemGrouping || 1
-  }
-
-//   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Successfully createYummyList ", yummyItem)
- console.log(this.dateTimeService.formatPartial(new Date) + ": Done creating yummylist ", JSON.stringify(yummyItem));
-return yummyItem;
-  }
-
-  createPriceTracing(productYummy: YummyList) :PriceTracing {
-
-
-   
-
-    let pricingTracing: PriceTracing ={
-      productId:productYummy.productId,
-      lastUpdated: this.dateTimeService.normalizeDate((new Date()).toString()),
-      accAmount: 0
-      ,
-    }
-
-    return pricingTracing;
-  }
-
-tableData: any[] = [
-  { id: 1, name: 'Row 1' },
-  { id: 2, name: 'Row 2' },
-  { id: 3, name: 'Row 3' }
-];
- 
-
-addRow(): void {
-
-  const newRow = { id: this.tableData.length + 1, name: 'New Row' };
-
-  this.tableData.push(newRow);
-}
-
-addNewRow(obj:any){
-
-  this.tableData.push(obj);
-
-}
-
-addNewRowStock(obj:StockItems){
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": adding new row to prev for addNewRowStock ");
-this.newStock_tableDate.push(obj);
-
-}
-
-addNewRowSOD_EOD(obj:SOD_EOD){
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": adding new row to prev for SOD -eod  ", obj);
-  this.sod_eod_tableData.push(obj);
-
-  
-
-}
-
-  constructor(private auth: AuthService , private http:HttpClient, private snackBar:MatSnackBar, 
-    public calender24:Calendar2024
-    ,public httpClientService:HttpClientService
-    ,public loaderBounceService: LoaderBounceService,
-  public dateTimeService:DateTimeService, private transform: ApiResponseTransformService,
-private dataArrayTransformerService: DataArrayTransformerService) { 
-
-
-    
-} 
-
-getAccessToken(): any { 
-
-  this.auth.getAccessTokenSilently().subscribe(
-    token => { 
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ': getAccessTokenSilently => Access Token: \n', token); 
-    
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ': idTokenClaims: \n', this.auth.idTokenClaims$ ); 
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ': User Details: \n', this.auth.user$ ); 
-    
-    // Send token to backend 
-    this.sendTokensToBackend(token); 
-    return token;
-  })
-
-  
-}
-
-  sendTokensToBackend(token: string): void { 
-    // Make a secure POST request to Node.js backend 
-    //this.http.post('http://your-backend-api/save-token', { token }).subscribe(); 
-  
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": sendTokensToBackend => ", token)
-  } 
-
-   
-  
- 
-getAllDetailss(): boolean {
-const functionName = this.dateTimeService.normalizeDate(Date.now())+" getAllDetails ";
-  console.log(functionName)
-  const startGetAllReport = Date.now();
-
-  this.loaderBounceService.setLoaderBouceStatus(true);
-  this.loadDataButtonState = false;
-  this.loadSpinner = true;
-  this.productListToShowOnCheckBox_AddNew.splice(0);
-  this.productPricingOnCheckBox_newStock.splice(0);
-
-  let success = false;
-
-  console.log(functionName+ ": dailyOpsRequest Status: " + this.dailyOpsRequest);
-  console.log(functionName+ ": loaderBounceService Status: " + this.loaderBounceService.loading_bounce);
-
-  forkJoin([
-    this.getProductPricing(),
-    this.getProductList(),
-    this.getEstimates(),
-    this.getPriceTracing(),
-    this.getAvailableItems(),
-    this.getSodEod(""),
-    this.getProductItemPricing_HTTP()
-  ]).subscribe({
-    next: ([pricing, productList, estimates, prieTracing, availableItems, sodEodList, productItemPricing]) => {
-
-      let response ={
-        productPricing: pricing,
-        productList: productList,
-        productEstimates:estimates,
-        productPriceTracing: prieTracing,
-        productAvailableItems: availableItems,
-        productSodEod: sodEodList,
-        productItemPricing: productItemPricing
-      }
-      console.log(`Responses from productService GetAllDetails`, response);
- 
- 
-      // ⏩ Normalize productPricing
-      this.productPricingList = Array.isArray(pricing)
-        ? pricing
-        : (pricing && typeof pricing === 'object' && 'data' in pricing && Array.isArray((pricing as any).data))
-          ? (pricing as any).data
-          : [];
-      console.log("✅ Assigned pricing_data:", JSON.stringify(this.productPricingList, null, 2));
-
-      // ⏩ Normalize and map productList to ProductList[]
-      const rawProductList = Array.isArray(productList)
-        ? productList
-        : (productList && typeof productList === 'object' && 'data' in productList && Array.isArray((productList as any).data))
-          ? (productList as any).data
-          : [];
-
-      this.productList = rawProductList.map((item: any): ProductList => ({
-        productId: Number(item.productId),
-        productName: String(item.productName),
-        productFlavor: String(item.productFlavor),
-        productPrice: Number(item.productPrice),
-        image_url: String(item.image_url),
-      }));
-
-      if (response.productList.data.length > 0) {
-        this.nextProductId_universal = this.generateProductID_Index(response.productList.data);
-        console.log("✅ Assigned productList:", JSON.stringify(response.productList, null, 2));
-      } else {
-        console.warn("⚠️ productList is empty.");
-      }
-
-      // ⏩ Assign other datasets
-      this.availableItems = Array.isArray(availableItems) ? availableItems : [];
-      this.sod_eod_list = Array.isArray(sodEodList) ? sodEodList : [];
-      //this.priceTracingList = Array.isArray(prieTracing.data) ? prieTracing : [];
-      this.productItemPricingList = Array.isArray(productItemPricing) ? productItemPricing : [];
-
-      this.productItemPricingList = productItemPricing.data;
-      this.priceTracingList = prieTracing.data;
-
-      if (response.productList.data.length > 0 && response.productAvailableItems.data.length > 0) {
-        this.createSodEodMatTable(response.productList.data, response.productAvailableItems.data);
-        
-      } else if (response.productEstimates.data.length > 0) {
-        // Optional estimate-related logic
-      } else {
-        this.productListUnCaptured = [];
-        this.stockAvailability = [];
-        this.productListOnStock = [];
-      }
-
-      if (response.productList.data.length > 0 && response.productPricing.data.length > 0) {
-        this.yummyList = this.createYummyListArray(this.productList, this.productPricingList);
-        console.log("Done creating yummyList on GetAllDetails", this.yummyList)
-      } else {
-        this.overViewList = [];
-        this.yummyList = []
-        console.warn("⚠️ Skipping createYummyListArray due to empty input. \n", `length for productList ${this.productList.length} \n length for productPricingList ${this.productPricingList.length} length from pricing response ${JSON.stringify(pricing)}`);
-       
-      }
-
-      // ✅ Wrap-up
-      success = true;
-      this.loadDataButtonState = true;
-      this.loadSpinner = false;
-
-      this.createSodEodMatTable(this.productList, this.availableItems)
-
-      this.showSuccess("✅ Done Loading ProductPricing, ProductList, Available Items");
-
-      // 💬 Summary Logs
-      console.log("✅ Overview:",console.table({
-        availableItems: this.availableItems.length,
-        productList: this.productList.length,
-        productPricingList: this.productPricingList.length,
-        productItemPricingList: this.productItemPricingList.length,
-        priceTracingList: this.priceTracingList.length,
-        sodEodList: this.sod_eod_list.length,
-      }));
-      
-
-     // this.sendProducts(this.productList);
-    },
-
-    error: (error) => {
-      this.loadDataButtonState = false;
-      this.loadSpinner = false;
-      this.showError(error.toString());
-      console.error("❌ Error fetching data:", error);
-    }
-  });
-
-  this.loaderBounceService.setLoaderBouceStatus(false);
-  console.log(this.dateTimeService.formatPartial(Date.now()) + ": loaderBounceService Status: " + this.loaderBounceService.loading_bounce);
-
-  return success;
-}
-
-loadAllProductDetails(): boolean {
- const functionName = `${this.dateTimeService.normalizeDate(Date.now())} loadAllProductDetails `;
-  console.log(`${functionName}🔁 Loading all product data via forkJoin`);
-  let success = true;
-  forkJoin([
-    this.getProductPricing(),
-    this.getProductList(),
-    this.getEstimates(),
-    this.getPriceTracing(),
-    this.getAvailableItems(),
-    this.getSodEod(""),
-    this.getProductItemPricing_HTTP()
-  ]).subscribe({
-    next: ([
-      pricingRes,
-      productListRes,
-      estimatesRes,
-      priceTracingRes,
-      availableItemsRes,
-      sodEodRes,
-      productItemPricingRes
-    ]) => {
-
-      // 🧠 Normalize and extract .data
-      const pricing = pricingRes?.data || [];
-      const rawProductList = productListRes?.data || [];
-      const estimates = estimatesRes?.data || [];
-      const priceTracing = priceTracingRes?.data || [];
-      const availableItems = availableItemsRes?.data || [];
-      const sodEodList = sodEodRes?.data || [];
-      const productItemPricing = productItemPricingRes?.data || [];
-
-console.log(`${functionName}
-  viewing data from API Response
-  pricing ${JSON.stringify(pricing)} \n 
-  rawProductList ${this.dataArrayTransformerService.extractArrayFromResponse(rawProductList) }
-  sodEodList ${sodEodList} \n 
-  productItemPricing ${productItemPricing}
-  `)
-
-      // 💾 Push into BehaviorSubjects
-      this.productPricing$.next(pricing);
-      this.productList$.next(rawProductList);
-      this.productEstimates$.next(estimates);
-      this.productPriceTracing$.next(priceTracing);
-      this.availableItems$.next(availableItems);
-      this.sodEodList$.next(sodEodList);
-      this.productItemPricing$.next(productItemPricing);
-
-      // 🧠 Assign for local usage
-      this.productPricingList = pricing;
-      this.productList = rawProductList;
-      this.priceTracingList = priceTracing;
-      this.productItemPricingList = productItemPricing;
-      this.availableItems = availableItems;
-      this.sod_eod_list = sodEodList;
-
-      let normalizedProducts ={
-        productist: this.productList$.getValue(),
-        pricing: this.productItemPricing$.getValue(),
-        sodEodList: this.sodEodList$.getValue(),
-        availableItems: this.availableItems$.getValue(),
-        productEstimates: this.productEstimates$.getValue(),
-        productItemPricing: this.productItemPricing$.getValue(),
-        productPriceTracing: this.productPriceTracing$.getValue(),
-        universalNextProductId: this.universalNextProductId$.getValue()
-      }
-
-      console.log("✅ Normalized Products:", JSON.stringify(normalizedProducts));
-  //          console.log("✅ Normalized Products:", JSON.stringify(normalizedProducts.productEstimates));
-  //    console.log("✅ Normalized Products:", JSON.stringify(normalizedProducts.productItemPricing));
-
-    //        console.log("✅ Normalized Products:", JSON.stringify(normalizedProducts.productPriceTracing));
-
-      // 🆔 Generate next product ID
-      if (normalizedProducts.productist.length > 0) {
-        console.log(`${functionName} Items found in product List Now geeting available product id`)
-        this.nextProductId_universal = this.generateProductID_Index(normalizedProducts.productist); 
-      }else{
-         this.nextProductId_universal =1;
-      }
-
-      // 🧮 Create SOD-EOD Table
-      if (rawProductList.length > 0 && availableItems.length > 0) {
-
-        this.createSodEodMatTable(rawProductList, availableItems);
-      } else if (estimates.length > 0) {
-        // ⏩ Future logic for estimates
-      } else {
-        this.productListUnCaptured = [];
-        this.stockAvailability = [];
-        this.productListOnStock = [];
-      }
-
-      // 🍬 YummyList generation
-      if (rawProductList.length && pricing.length) {
-        this.yummyList = this.createYummyListArray(rawProductList, pricing);
-        console.log("✅ YummyList created");
-      } else {
-        this.overViewList = [];
-        this.yummyList = [];
-        console.warn("⚠️ Skipping createYummyListArray — missing data");
-      }
-
-      // ✅ Final UI & Logs
-      this.loadSpinner = false;
-      this.loadDataButtonState = true;
-      this.showSuccess("✅ Product data loaded successfully");
-
-      console.log(`[${new Date().toLocaleTimeString()}] ✅ Load Summary:`);
-      console.table({
-        productPricing: pricing.length,
-        productList: rawProductList.length,
-        priceTracing: priceTracing.length,
-        productItemPricing: productItemPricing.length,
-        availableItems: availableItems.length,
-        sodEod: sodEodList.length,
-        estimates: estimates.length
-      });
-    },
-
-    error: (error) => {
-      success = false;
-      this.loadSpinner = false;
-      this.loadDataButtonState = false;
-      console.error(`[${new Date().toLocaleTimeString()}] ❌ Error loading product data`, error);
-      this.showError(error.toString());
-    }
-  });
-
-
-  return success;
-}
-
-
-
-
-  createProductItemPricing(yummyList: any):void {
-
-  for(let yummy of yummyList){
-
-    this.addProductItemPricing(this.calculateProductItemPricing(yummyList));
-
-  }
-
-
-}
-
-
-   getProductsHttpCall(): ProductList[]{
-
-    this.getProductList().subscribe(
-      data=>{
-      // checkboxSpinner = false;
-
-        this.productList = data.data;
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Return Product List", JSON.stringify(data));
-
-      //   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Retrived Data for this productList using PreviewViewComponent", this.productList);
-      }
-    )
-
-    return this.productList; 
-}
-   
-   createSodEodMatTable(productList:ProductList[], availableItems:AvailableItems[]):void{
-
-    const _productList :ProductList[] = productList;
-    const _availableItems:AvailableItems[] = availableItems;
-    const functionName = `createSodEodMatTable`
-    const startIme = Date.now();
-
-    console.log(`${functionName} - ${this.dateTimeService.normalizeDate(Date.now())} creating SodEodMatTable productList lenght[${_productList.length}] \n availableItems lenght[${_availableItems.length}] `)
-    let productIdFound = false;
-
-      for(let products of productList){
-
-          for(let avaialbleProducts of availableItems){
-            console.log("Searching for product Id[" +products.productId +"] if available on :" + JSON.stringify(avaialbleProducts))
-
-            if(avaialbleProducts.productId === products.productId){
-            console.log(`${functionName} - ${this.dateTimeService.normalizeDate(Date.now())} Found Product[${products.productId}] to prepare table:`)
-
-              productIdFound =true;
-
-              if(avaialbleProducts.itemsRemaining<=0){
-                
-            console.log(`${functionName} - ${this.dateTimeService.normalizeDate(Date.now())} Found Product[${products.productId}] to prepare table:`)
-
-                //items available on Avaiable Items but they are out of stock
-                 console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now())  + ": Out Of Stock: Product Id[" + products.productId + "]");
-                
-                let productListOutOfStock: MatTableSOD_EOD ={
-                  productId: products.productId,
-                  itemsTaken: 0,
-                  itemsRemaining: avaialbleProducts.itemsRemaining,
-                  date: this.ClickedCalenderDate,
-                  productName: products.productName + "-" + products.productFlavor,
-                  availableItems: avaialbleProducts.itemsRemaining,
-                  outOfStock: true,
-                  sellingPrice: this.getSellingPrice(products.productId)
-                }
-                console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now()) + `DOne creating product List Out Of Stock for Mat Table from createSodEodMatTable `, productListOutOfStock)
-
-                this.productListOutOfStock.push(productListOutOfStock);
-                this.stockAvailability.push(productListOutOfStock);
-                console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now())+`Done Creating productListToShowOnCheckBox_AddNew based on Stock Availlability ${this.stockAvailability}`)
-                this.productListToShowOnCheckBox_AddNew = this.stockAvailability;
-
-              }else{
-                // Items are avaiable
-                 console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now())+ ": Product Id[" + products.productId + "] On Stock");
-
-                  let productListOnStock: MatTableSOD_EOD ={
-                    productId: products.productId,
-                    itemsTaken: 0,
-                    itemsRemaining: 0,
-                    date: this.ClickedCalenderDate,
-                    productName: products.productName +"-"+ products.productFlavor,
-                    availableItems: avaialbleProducts.itemsRemaining,
-                    outOfStock: false,
-                    sellingPrice: this.getSellingPrice(products.productId)
-                  }
-
-                console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now()) + `DOne creating product List On Stock for Mat Table from createSodEodMatTable `, productListOnStock)
-
-                this.productListOnStock.push(productListOnStock);
-                this.stockAvailability.push(productListOnStock);
-                
-
-              }
-              break;
-            }
-
-            // End of If, Right Time to Push 
-          }
-          // Record the Product Id not found
-          if(productIdFound === false){
-
-             console.log(functionName + "  - "+this.dateTimeService.normalizeDate(Date.now()) + ": Product Id[" + products.productId + "] not captured");
-            let productListUnCaptured: MatTableSOD_EOD ={
-              productId: products.productId,
-              itemsTaken: 0,
-              itemsRemaining: 0,
-              date: this.ClickedCalenderDate,
-              productName: products.productName +"-"+ products.productFlavor,
-              availableItems: -1,
-              outOfStock: true,
-              sellingPrice: this.getSellingPrice(products.productId)
-            }
-                console.log(`DOne creating product List UnCaptured for Mat Table from createSodEodMatTable `, productListUnCaptured)
-
-            this.productListUnCaptured.push(productListUnCaptured);
-            this.stockAvailability.push(productListUnCaptured);
-            // Create SOD EOD Table Data
-
-
-          }else{
-
-          }
-          productIdFound = false;
-      }
-
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": productListUnCaptured", this.productListUnCaptured);
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": stockAvailability", this.stockAvailability);
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": productListOnStock", this.productListOnStock);
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": productListOutOfStock", this.productListOutOfStock);
-
-      this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.stockAvailability)
-
-
-}
-productToShowOnCheckBox:MatTableSOD_EOD[]=[];
-checkBox_SOD_EOD_productToShow(operation:string):void{
-
-  const functionName = "checkBox_SOD_EOD_productToShow ";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + functionName + ": checkBox_SOD_EOD_productToShow: Started");
-
-  if(operation==="productListUnCaptured"){
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Operation: productListUnCaptured");
-    this.dataSourceSodEod.data.splice(0)
-    this.dataSourceSodEod._updateChangeSubscription();
-    this.productToShowOnCheckBox= [];
-    this.productToShowOnCheckBox = this.productListUnCaptured;
-    this.productListToShowOnCheckBox_AddNew = this.productListUnCaptured;
-    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.productListUnCaptured)
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + functionName +  ": Set productToShowOnCheckBox to productListUnCaptured", this.productListUnCaptured);
-
-  }else if(operation==="productListOnStock"){
-     console.log(this.dateTimeService.formatPartial(Date.now()) +  functionName + ": Operation: productListOnStock");
-    this.dataSourceSodEod.data.splice(0)
-    this.dataSourceSodEod._updateChangeSubscription();
-    this.productToShowOnCheckBox= [];
-    this.productToShowOnCheckBox = this.productListOnStock; 
-    this.productListToShowOnCheckBox_AddNew = this.productListOnStock;
-    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.productListOnStock);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + functionName +  ": Set productToShowOnCheckBox to productListOnStock", this.productListOnStock);
-
-  }else if(operation==="productListOutOfStock"){
-     console.log(this.dateTimeService.formatPartial(Date.now()) + functionName +  ": Operation: productListOutOfStock");
-    this.dataSourceSodEod.data.splice(0)
-    this.dataSourceSodEod._updateChangeSubscription();
-    this.productToShowOnCheckBox = this.productListOutOfStock;
-    this.productListToShowOnCheckBox_AddNew = this.productListOutOfStock;
-    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.productListOutOfStock)
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) +  functionName + ": Set productToShowOnCheckBox to productListOutOfStock", this.productListOutOfStock);
-
-  }else if(operation==="stockAvailability"){
-     console.log(this.dateTimeService.formatPartial(Date.now()) +  functionName + ": Operation: stockAvailability");
-    this.dataSourceSodEod.data.splice(0)
-    this.dataSourceSodEod._updateChangeSubscription();
-    this.productToShowOnCheckBox= [];
-    this.productToShowOnCheckBox = this.stockAvailability;
-    this.productListToShowOnCheckBox_AddNew = this.stockAvailability;
-    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.stockAvailability)
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) +  functionName + ": Set productToShowOnCheckBox to stockAvailability", this.stockAvailability);
-
-  }else if(operation == "matCheckbox"){
-     console.log(this.dateTimeService.formatPartial(Date.now()) +  functionName + ": Operation: matCheckbox");
-    this.productToShowOnCheckBox = [];
-    this.dataSourceSodEod.data.splice(0)
-    this.dataSourceSodEod._updateChangeSubscription();
-    this.productToShowOnCheckBox= [];
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Cleared productToShowOnCheckBox for matCheckbox");
-
-  }else{
-    console.error( functionName + "Invalid Operation Type: "+ operation);
-  }
-
-}
-
-getProductItemPricing_HTTP() : Observable<ApiResponse<ProductItemPricing[]>>{
-    //api - Node Express Routes 
-    this.fullApiUrl = this.apiUrl+ "getProductItemPricing";
-
-          console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Path for getProductItemPricing_HTTP -> " +  this.fullApiUrl);
-    
-        return this.http.get<ApiResponse<ProductItemPricing[]>> (this.fullApiUrl) ;
-    
-}
-
-valid(validate: Login) : Observable<void[]>{
-
-  
-  this.fullApiUrl =  this.apiUrl + api.validateUser;
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for valid(): " +  this.fullApiUrl);
-
-  return  this.http.post<void[]> (this.fullApiUrl, validate) ;  
-}
-
-
-addProducts(product: ProductList) : Observable<ProductList>{
-
-    
-    this.fullApiUrl = this.apiUrl + "addProduct";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Adding To Products using API  : " +  this.fullApiUrl);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Values to be added \n");
-    console.log(product);
-
-    return this.http.post<ProductList>( this.fullApiUrl, product);
-
-  }
-addProductItemPricing_HTTP(product: ProductItemPricing) : Observable<ProductItemPricing>{
-    
-    this.fullApiUrl = this.apiUrl + "addProductItemPricing";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Adding To Products using API  : " +  this.fullApiUrl);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Values to be added \n");
-    console.log(product);
-
-    return this.http.post<ProductItemPricing>( this.fullApiUrl, product);
-
-  }
-
-calculateDailyEstimates(_itemsTaken :number, _itemsReturned :number,sellingPrice:number): number{
-
-  /*
-    Take the numbe of Items Taken and multiply it by selling price
-
-  */
-
-
-    if(_itemsTaken === 0 && _itemsReturned ===0 ){
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ":  Values are 0, so 0 is returned ");
-      return 0;
-    }else if(_itemsReturned ==0){
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ":  _itemsTaken * sellingPrice", _itemsTaken * sellingPrice);
-
-      return _itemsTaken * sellingPrice
-
-    }else if(_itemsReturned > 0 && _itemsReturned> 0 ){
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ":  _itemsTaken - _itemsReturned ) * sellingPrice", ( _itemsTaken - _itemsReturned ) * sellingPrice);
-
-      return(_itemsTaken - _itemsReturned ) * sellingPrice
-
-    }else{
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ":  No Option was executed, so 0 is returned ");
-
-      return 0;
-    }
-
-    
-
-}
-calculateDailyEstimatesReturn(_itemsRemaining :number, sellingPrice:number): number{
-
-  
-  return _itemsRemaining * sellingPrice;
-
-}
-// 
-onDateSelected(selectedDate: Date): void {
-  // Do something with the selected date
-  this.selectedDate = selectedDate;
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ': Selected date:', this.selectedDate);
-}
-
-/*
-// Getting Products api getallProduct - Copied
-  getProductList() : Observable<ApiResponse<ProductList[]>>{
-
-      this.fullApiUrl = this.apiUrl + "getProductList";
-      
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getProductList(): " +  this.fullApiUrl );
-
-
-      return this.http.get<ApiResponse<ProductList[]>> (this.fullApiUrl);
-      
-    
-}*/
-getProductList(): Observable<ApiResponse<ProductList[]>>{
-  this.fullApiUrl = this.apiUrl + 'getProductList';
-
-  console.log(
-    this.dateTimeService.formatPartial(Date.now()) +
-      ': API Get Path for getProductList(): ' +
-      this.fullApiUrl
-  );
-
- // return this.http.get<ApiResponse<ProductList[]>>(this.fullApiUrl).pipe(
- //   map((response) => this.getArrayFromResponse<ProductList>(response))
- // );
-
-  return this.httpClientService.get<ApiResponse<ProductList[]>>("getProductList", {},"productList")
-
-}
-
-
-getArrayFromResponse<T>(response: ApiResponse<T[]>): T[] {
-  if (Array.isArray(response)) {
-    return response;
-  }
-
-  if (
-    response &&
-    typeof response === 'object' &&
-    'data' in response &&
-    Array.isArray(response.data)
+  checkBoxSelectedProducts_AddNew = new MatTableDataSource<AddNewStock>([]);
+  checkBoxSelectedProducts: MatTableSOD_EOD[] = [];
+
+  productListToShowOnCheckBox_AddNew: any[] = [];
+  productPricingOnCheckBox_newStock: ProductPricing[] = [];
+  groupNumber: number = 1;
+
+  tableData: any[] = [
+    { id: 1, name: 'Row 1' },
+    { id: 2, name: 'Row 2' },
+    { id: 3, name: 'Row 3' }
+  ];
+
+  productToShowOnCheckBox: MatTableSOD_EOD[] = [];
+  checkProducts: ProductList[] = [];
+  checkedItems: AddNewStock[] = [];
+  matTable_sod_eod: MatTableSOD_EOD[] = [];
+  dataSourceSodEod = new MatTableDataSource<MatTableSOD_EOD>();
+  newSodEod!: MatTableDataSource<MatTableSOD_EOD>;
+  imagePreview: any[] = [];
+
+  newStockedItems: StockedItems[] = [];
+  newAvailableItems: AvailableItems[] = [];
+
+  selectedFiles: FileList | null = null;
+  message: string = '';
+  fileName: string = '';
+  fileType: string = '';
+  newFileName: string = '';
+  fileSize: number = 0;
+  key: string = '';
+
+  constructor(
+    private auth: AuthService,
+    private http: HttpClient,
+    private snackBar: MatSnackBar,
+    public calender24: Calendar2024,
+    public httpClientService: HttpClientService,
+    public loaderBounceService: LoaderBounceService,
+    public dateTimeService: DateTimeService,
+    private transform: ApiResponseTransformService,
+    private dataArrayTransformerService: DataArrayTransformerService
   ) {
-    return response.data;
+    // FIX #25: field initialisers that use constructor-parameter properties break under
+    // useDefineForClassFields / ES2022 targets. Initialise here instead.
+    this.ClickedCalenderDate = this.dateTimeService.normalizeDate(new Date());
   }
 
-  console.warn('API response missing or invalid "data" array:', response);
-  return [];
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  SMALL HELPERS
+  // ═══════════════════════════════════════════════════════════════════
 
-calculateProductItemPricing(yummyList:YummyList): ProductItemPricing{
-/* 
-      Group Items - 
-      CAlculate cost per item in a group - 
-      profit per item in a group
-      find remainders in a group and calculate its cost
-
-*/
-
-let constOfRemainder = 0;
-let remainder = 0;
-let groupQuantity = 0;
-let costOfRemainder = 0;
-let groupProfitPerItem =0;
-let groupCommisionPerItem =0;
-
-
-if(yummyList.itemGrouping == 0){
-
-  this.showError("_groupNumber is Zero \n OPeration was cancelled")
-}else{
-
- 
-  costOfRemainder = remainder * yummyList.costPerItem;
-  groupQuantity = Math.trunc(yummyList.productQuantity / yummyList.itemGrouping);
-  remainder = yummyList.productQuantity % yummyList.itemGrouping;
-
-
-
-  if(groupQuantity !=0){
-     groupProfitPerItem = yummyList.productProfit/groupQuantity;
-     groupCommisionPerItem = yummyList.productQuantity/groupQuantity;
+  /** Turn anything (string, Error, HttpErrorResponse, object) into readable text for the snackbar. */
+  private msg(m: any): string {
+    if (typeof m === 'string') return m;
+    if (m?.error?.message) return String(m.error.message);
+    if (m?.message) return String(m.message);
+    try { return JSON.stringify(m); } catch { return String(m); }
   }
 
-
-
-  if(remainder !=0 ){
-
-      // THere is a remainder on an Item, VAlue its not 0
-
-      constOfRemainder = yummyList.costPerItem + remainder;
-
-
-
-  }else{
-
-    // THere was a remainder and we need to calc the cost of what is remaining 
-
-     
+  /** Accepts `[..]`, `{data:[..]}` or mysql-style `[[rows],[meta]]` and returns the flat row array. */
+  private unwrap<T>(res: any): T[] {
+    if (Array.isArray(res)) return (Array.isArray(res[0]) ? res[0] : res) as T[];
+    const d = res?.data;
+    if (Array.isArray(d)) return (Array.isArray(d[0]) ? d[0] : d) as T[];
+    return [];
   }
 
-}
-
-let itemCost:ProductItemPricing ={
-
-  productDescription: yummyList.productId.toString(),
-  itemsRemainder: remainder,
-  costOfRemainder: costOfRemainder,
-  groupedQuantity: groupQuantity,
-  groupedProfit: groupProfitPerItem,
-  groupedCommission: groupCommisionPerItem,
-  itemGroup: yummyList.itemGrouping,
-  productId: yummyList.productId
-}
-
- return itemCost;
-    
-}
-
-updateProductPricing(api:string,productPricing:productPricing) : Observable<void[]>{
-
- 
-    this.fullApiUrl = this.apiUrl + "updateProductPricing";
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateProductPricing sending " +  this.fullApiUrl +" \n"+ productPricing);
-
-    return  this.http.put<void[]> (this.fullApiUrl, productPricing) ;
-    
-}
-
-updateProductItemPricing(productItemPricing:ProductItemPricing) : Observable<void[]>{
-  this.fullApiUrl = this.apiUrl + "updateProductItemPricing";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateProductPricing sending " +  this.fullApiUrl +" \n"+ productItemPricing);
-  return  this.http.put<void[]> (this.fullApiUrl, productItemPricing) ;
-  
-}
-
-updateYummyList(productPricing: ProductPricing): Observable<ProductPricing> {
-
-  this.fullApiUrl = this.apiUrl + "updatePricingList";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateYummyList():" +  this.fullApiUrl);
-
-  return  this.http.put<ProductPricing> (this.fullApiUrl, productPricing) ; 
-}
-
-httpCall_UpdateYUmmyList(yummyList:YummyList){
-
-  let productPricing : ProductPricing ={
-    productId: yummyList.productId,
-    productSize: yummyList.productSize,
-    productQuantity: yummyList.productQuantity,
-    costPerItem: yummyList.costPerItem,
-    productProfit: yummyList.productProfit,
-    sellingPrice: yummyList.sellingPrice,
-    productCommission: yummyList.productCommission,
-    itemGrouping: yummyList.itemGrouping
-  }
-
-
-
-
-  this.updateYummyList(productPricing).subscribe(
-    success =>{
-      this.showSuccess("SUccessfully Updated httpCall_UpdateYUmmyList")
-
-    }, error => {
-      this.showError(error);
-    }
-  )
-
-}
-
-updateYummyListTable(
-  productList: ProductList[],
-  pricingList: ProductPricing[],
-  availableItems: AvailableItems[],
-  priceTracingList: PriceTracing[],
-): Tracer {
- let functionName = 'updateYummyListTable'
-  
-let updateProgress: Tracer ={
-  status: false,
-  message: ''
-}
-  // Extract relevant objects
-  const product = productList?.[0] ?? null;
-  const pricing = pricingList?.[0] ?? null;
-  const available = availableItems?.[0] ?? null;
-  const priceTracing = priceTracingList?.[0] ?? null;
-
-  // Validate required data
-  if (!product || !pricing || !available || !priceTracing) {
-    
-     updateProgress.message='❌ Missing one or more required data objects for updating.'
-    return updateProgress;
-  }
-
-  // Prepare update observables
-  const updateOps$ = forkJoin([
-    this.updateProductListByID('updateProductList', product),
-    this.updateProductPricing('updateProductPricing', pricing),
-    this.updateAvailableItems(available),
-    this.updatePriceTracing(priceTracing),
-    this.updateYummyList(pricing)
-  ]);
-
-  // Execute updates
-  updateOps$.subscribe({
-    next: ([res1, res2, res3, res4, res5]) => {
-      updateProgress.status = true;
-      updateProgress.message='✅ YummyList row updated successfully.';
-      return updateProgress;
-    },
-    error: (err) => {
-      const errorMessage = typeof err === 'object' ? JSON.stringify(err.message) : String(err);
-      updateProgress.message=`❌ Failed to update YummyList row: ${errorMessage}`;
-      return updateProgress;
-    }
-  });
-
-  return updateProgress;
-}
-
-
-updateMatTableDate(newDate:Date):void{
-
-
-  // ComE bACK USe later SOD EOD
-  this.ClickedCalenderDate = newDate; // update the date
-  let newSOD_EOD: Array<MatTableSOD_EOD> =[];
-
-  let matListCopy = this.checkBoxSelectedProducts.slice();
-
-  if(matListCopy.length>0){
-
-      for(let matTableData of matListCopy){
-
-        let opsList : MatTableSOD_EOD ={
-          productId:matTableData.productId,
-          productName:matTableData.productName,
-          itemsRemaining:matTableData.itemsRemaining,
-          itemsTaken:matTableData.itemsTaken,
-          date: this.dateTimeService.normalizeDate(this.ClickedCalenderDate),
-          availableItems:matTableData.availableItems,
-          outOfStock:matTableData.outOfStock ,
-          sellingPrice: this.getSellingPrice(matTableData.productId)       
+  /**
+   * FIX #2: MySQL drivers return DECIMAL/BIGINT as strings. Strict `===` comparisons on productId
+   * and `+` arithmetic on prices/quantities silently break with strings. Coerce once, at the edge.
+   */
+  private coerce<T>(rows: any[], keys: string[]): T[] {
+    return (rows ?? []).map(r => {
+      const o: any = { ...r };
+      for (const k of keys) {
+        if (k in o && o[k] !== null && o[k] !== '') {
+          const n = Number(o[k]);
+          if (!Number.isNaN(n)) o[k] = n;
         }
-
-        newSOD_EOD.push(opsList);
       }
-      this.checkBoxSelectedProducts = newSOD_EOD;
-
-
-  }else{
-    console.log(this.dateTimeService.formatPartial(Date.now()) + " Nothing was selected to add to SOD_EOD");
-    //this.showError("Nothing was checked..!");
-  }
-
-
-}
-
-checkProducts : ProductList[]=[];
-
-
-
-checkedItems : AddNewStock[]=[];
-
-
- getYummyList(): YummyList[] {
-  this.getProductList().subscribe(productListResponse => {
-    const rawProductList = Array.isArray(productListResponse)
-      ? productListResponse
-      : (productListResponse && typeof productListResponse === 'object' && 'data' in productListResponse && Array.isArray((productListResponse as any).data))
-        ? (productListResponse as any).data
-        : [];
-
-    const flatProductList = Array.isArray(rawProductList[0]) ? rawProductList[0] : rawProductList;
-
-    this.getProductPricing().subscribe(productPricingResponse => {
-      const rawProductPricing = Array.isArray(productPricingResponse)
-        ? productPricingResponse
-        : (productPricingResponse && typeof productPricingResponse === 'object' && 'data' in productPricingResponse && Array.isArray((productPricingResponse as any).data))
-          ? (productPricingResponse as any).data
-          : [];
-
-      const flatProductPricing = Array.isArray(rawProductPricing[0]) ? rawProductPricing[0] : rawProductPricing;
-
-      const yummyList = this.createYummyListArray(flatProductList, flatProductPricing);
-
-      this.yummyList.splice(0)
-      for(let x=0 ;x < yummyList.length ;x++){
-
-        this.yummyList.push(yummyList[x])
-      }
-      
-      console.log("✅ YummyList created:", yummyList);
-      return yummyList;
-      //this.dataSourceYummylist.paginator = this.paginator;
-      
-
+      return o as T;
     });
-  });
-
-      console.log("✅ Returning FUlly Created YUmmyLIst:", this.yummyList);
-
-  return this.yummyList;
-}
-
-populateToMatTable():void {
-
-this.checkBoxSelectedProducts_AddNew.data = this.checkedItems;
-
-
-}
-
-matTable_sod_eod:MatTableSOD_EOD[] = [];
-dataSourceSodEod = new MatTableDataSource<MatTableSOD_EOD>();
-newSodEod!: MatTableDataSource<MatTableSOD_EOD>;
-
-deleteMat_TableSodEodId(productId:number, MatTableObj:any): void {
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now deleing data row on mat table \n Receveived Product Id =>", productId);
-  const foundProductIndex = MatTableObj.data.findIndex((MatTableObj: { productId: number; }) => MatTableObj.productId === productId);
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": foundProductIndex :" + foundProductIndex);
-  console.log(Date.now + " *********x :");
-
-
-  if (foundProductIndex !== -1) {
-    MatTableObj.data.splice(foundProductIndex, 1);  // Remove the product from data
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Table Index ["+foundProductIndex + "] New Table List \n " + MatTableObj.data);
-    MatTableObj._updateChangeSubscription(); // Refresh the table
-  }
-}
-
-imagePreview:any[]=[];
-
-updateSelectedProducts(event: any, product: YummyList, index:number, operation:string): void {
- console.log(`updateSelectedProducts event ${event} products ${JSON.stringify(product)} index ${index} operation ${operation}`)
-const functionName=" updateSelectedProducts "
-  let newStock:AddNewStock[]=[];
-  
-  const isChecked: boolean = event.checked; // Get the checked property of the event
-  // store checkbox index into a value
-  
-   console.log(functionName + this.dateTimeService.formatPartial(Date.now()) + ": CheckBox Index of Clicked => ", index)
-  const productId = product.productId;
-  const newProductId = index +1;
-  const productSelected = product.productName;
-
-  let checkboxIndexObject:CheckboxIndex={
-    index: index,
-    checked: true,
-    productName: productSelected,
-    productId: productId,
-    date : this.dateTimeService.normalizeDate(Date.now()),
   }
 
-  
-  //const availableItems = product.availableItems;
-        console.log(`UPdatuing Selceted product checkboxIndexObject  + ${JSON.stringify(checkboxIndexObject)} \n ProductList: ${JSON.stringify(this.productList)
-        }`)
-
-
-        
-          const getAvailaleProduct = this.createAvailableItemsById(checkboxIndexObject.productId);
-console.log(`UPdatuing Selceted product checkboxIndexObject - getAvailaleProduct + ${JSON.stringify(checkboxIndexObject)} \n ProductList: ${JSON.stringify(getAvailaleProduct)
-        }`)
-
-  //product.itemsRemaining;
-  //product.itemsTaken;
-//  const outOfStock = product.outOfStock;
-//  const productName = product.productName;
-//  const sellingP = product.sellingPrice;
- 
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": checkbox index Clicked => ", index)
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": productId Clicked => ", checkboxIndexObject.productId)
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": productSelected "+ checkboxIndexObject.productName);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": availableItems : "+ getAvailaleProduct);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": date : "+ checkboxIndexObject.date);
-
-//   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": outOfStock  => ", outOfStock)
-//   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": newProductId "+ newProductId);
-//   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": productName: "+ productName);
-//   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": sellingPrice "+ sellingP);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": availableItems list"+ this.availableItems);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": productList list"+ this.productList);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": sod_eod list"+ this.sod_eod_list);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": sod_eod_tableData list"+ this.sod_eod_tableData);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": sod_eod_component boolean"+ this.sod_eod_component);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": checkBoxSelectedProducts: checkBoxSelectedProducts", this.checkBoxSelectedProducts);
-   console.log(functionName +this.dateTimeService.formatPartial(Date.now()) + ": this.checkedItems  => ", this.checkedItems)
-
-        console.log(functionName+"this.newStock_component:"+this.newStock_component)
-        if (event.checked) {
-      
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": New Check Nox Ins checked..! Folowing its evens sent \n ",event)
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": Status for this.sod_eod_component \n", this.sod_eod_component)
-          if(this.sod_eod_component){
-
-
-          
-          //this.newSodEod = this.checkBoxSelectedProducts.slice();
-          // this.newSOD_EOD
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": newSodEod  => ", product);
-
-           let matTableSod: MatTableSOD_EOD = {
-              productId: product.productId,
-              itemsTaken: 0,
-              itemsRemaining: 0,
-              date: getAvailaleProduct.lastUpdated,
-              productName: `${product.productName} ${product.productFlavor}`,
-              sellingPrice: product.sellingPrice,
-              availableItems: getAvailaleProduct.itemsRemaining,
-              outOfStock: getAvailaleProduct.itemsRemaining > 0 ? false : true
-            };
-
-
-            this.checkBoxSelectedProducts.push(matTableSod);
-
-
-            console.log(this.dateTimeService.formatPartial(Date.now()) + ": pushed product into sod eod table=> ", product);
-
-             console.log(this.dateTimeService.formatPartial(Date.now()) + ": this.dataSourceSodEod.datad  => ", this.dataSourceSodEod.data);
-
-             
-        // this.newSodEod
-        this.dataSourceSodEod.data = this.checkBoxSelectedProducts;
-        console.log(this.dateTimeService.formatPartial(Date.now()) + ": assigned checkBoxSelectedProducts in to the table => ", this.checkBoxSelectedProducts);
-
-        this.dataSourceSodEod._updateChangeSubscription();
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Mat table sod sod should be updated with data")
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": newSodEod -> checked : "+ this.checkBoxSelectedProducts)
-
-        // New SOD EOD Data Population
-//        this.matTable_sod_eod = this.checkBoxSelectedProducts.slice();
-        ///this.matTable_sod_eod.push(this.createSodEodTableCheck(product));
-        ///this.dataSourceSodEod.data =  this.matTable_sod_eod;
-        
-        ///this.checkBoxSelectedProducts = this.matTable_sod_eod;
-        // console.log(this.dateTimeService.formatPartial(Date.now()) + ":  Done adding New Item on Table ", this.checkBoxSelectedProducts);
-
-        
-
-
-        }else if(this.newStock_component){
-          console.log(`Updating New Stock Data: + ${this.newStock_component} product data to work with ${JSON.stringify(product)}` );
-          //this.showLoading("Generating New YummyList fo checked Ite,\m");
-          // New Stock Data Population
-          let productList: ProductList = {
-            productId: product.productId,
-            productName: product.productName,
-            productFlavor: product.productFlavor,
-            productPrice: product.productPrice,
-            image_url: `${product.productName} ${product.productName}.webp`
-          }
-          console.log("productList to be processed to YUmmylist", productList)
-
-          let yummyL = this.getYummyListById(product)
-
-          console.log(`Updating New Stock Data: returned getYummyListById  ${JSON.stringify(yummyL)}` );
-
-          
-          //let addNewStock : AddNewStock[]=[];
-          let addNewStock = this.createNewStockMatTable(this.getProductListByProductId(product.productId), yummyL);
-          console.log(`Updating New Stock Data: returned createNewStockMatTable  ${JSON.stringify(yummyL)}` );
-
-
-          // console.log(this.dateTimeService.formatPartial(Date.now()) + ": Popukated Yummy List", yummyL);
-          // console.log(this.dateTimeService.formatPartial(Date.now()) + ": Popukated addNewStock ", addNewStock );
-          // console.log(this.dateTimeService.formatPartial(Date.now()) + ": Pushing stuff to checkedItems Products ",  product, " \n YummyList of ", yummyL);
- 
-          this.checkedItems.splice(0);
-           console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": Objects for Yummy" + Object.keys(yummyL) 
-            + "Prouct Keys" + Object.keys(product))
-          
-             console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": DAta to add on New Stock", addNewStock);
-//this.checkedItems.push(this.createNewStockMatTable(product, yummyL));
-
-           // this.stockView.addMat_Table_Data(addNewStock);
-
-             console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": done adding new stock on On Mat-Table product [" + addNewStock.productId + "] \n data" + JSON.stringify(productList) + "sent check box product" + JSON.stringify(product) );
-          if(Object.keys(yummyL) && Object.keys(product)){
-            
-            
-           // this.stockView.addMat_Table_Data(addNewStock);
-
-
-          }else{
-             console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": One of the Objects is empty, cannot create Stock Table")
-
-          }
-           console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": CheckBox products checkedItems=> ", this.checkedItems)
- 
-        }else{
-
-           console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": This is not SOD EEOD nor newStock_component COMPONENT")
-        }
-      } else {
-
-        // Remove the product from the selected array if unchecked
-         console.log("Updating New Stock Data:" +this.dateTimeService.formatPartial(Date.now()) + ": Unchecked [" + productId + "]");
-
-        if(this.sod_eod_component){
-
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": Unchecked productId: " + productId);
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ":  Now Remove the unchecked" );
-
-          this.imagePreview.push(index);
-          // RemoveMatTable by Id
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now Remove the unchecked on MatTable" );
-          this.removeSodEodByProductId(productId);
-
-
-///           this.spliceMatTableOfSOD_EOD(productId);
-        //  this.checkBoxSelectedProducts.data = this.checkBoxSelectedProducts.filter(item => item.productId !== productId);
-///            this.deleteMat_TableSodEodId(productId, this.dataSourceSodEod);
-
-        //const filteredData = this.checkBoxSelectedProducts.filter(item => item.productId !== productId);
-        //this.checkBoxSelectedProducts = filteredData;
-
-        // console.log(this.dateTimeService.formatPartial(Date.now()) + ": CheckBox products => ", filteredData)
-       
-
-
-        }else if(this.newStock_component){
-          
-          //this.stockView.removeMat_Table_Data_productId(productId);
-
-        }else{
-
-        }
-    
-
-
-
-      }
-
-}
-  createSodEodTableCheck(product: any): MatTableSOD_EOD {
-
-
-const availableItems = product.availableItems;
-const date = product.date;
-//product.itemsRemaining;
-//product.itemsTaken;
-const outOfStock = product.outOfStock;
-const productId = product.product;
-const productName = product.productName;
-const sellingP = product.sellingPrice;
-
-
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": creating SodEod Table onCheck: " + product);
-
-    let sod_eod_base_table: MatTableSOD_EOD ={
-      productId: productId,
-      itemsTaken: 0,
-      itemsRemaining: 0,
-      date: date,
-      productName: productName,
-      availableItems: availableItems,
-      outOfStock: true,
-      sellingPrice: this.getSellingPrice(0)       
-    
-    }
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done with sod_eod_base_table onClick: " + sod_eod_base_table);
-/*
-    for(let sod_eod_table of this.stockAvailability){
-
-      if(sod_eod_table.productId === product.productId){
-
-        let sod_eod_temp_table : MatTableSOD_EOD ={
-
-          productId: sod_eod_table.productId,
-          itemsTaken: sod_eod_table.itemsTaken,
-          itemsRemaining: sod_eod_table.itemsRemaining,
-          date: sod_eod_table.date,
-          productName: sod_eod_table.productName,
-          availableItems: sod_eod_table.availableItems,
-          outOfStock: sod_eod_table.outOfStock,
-          sellingPrice: this.getSellingPrice(sod_eod_table.productId)       
-        
-        }
-
-        return sod_eod_temp_table;
-
-      }else{
-
-      }
-
-    }
-
-*/
-    return sod_eod_base_table;
-
+  private sameDay(a: any, b: any): boolean {
+    const da = new Date(a), db = new Date(b);
+    if (isNaN(da.getTime()) || isNaN(db.getTime())) return false;
+    return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
   }
 
-
-
-getAvaialableItemsById(productId:number):number{
-
-  let availableItems=0;
-  this.getAvailableItemsById_http(productId).subscribe(itemsRemaining => {
-  console.log(`Items remaining for productId ${productId}: ${itemsRemaining}`);
-  availableItems = itemsRemaining;
-});
-
-return availableItems;
-}
-
-getAvailableItemsById_http(productId: number): Observable<number> {
-  const functionName = `${this.dateTimeService.normalizeDate(Date.now())} getAvailableItemsById Started...`;
-  const defaultValue = 0;
-
-  console.log(functionName + ` Fetching available items for productId [${productId}]`);
-
-  return new Observable<number>((observer) => {
-    this.getAvailableItems().subscribe({
-      next: (res) => {
-        const flatList = ResponseUtils.extractFirstArrayFromNested<AvailableItems>(res);
-        console.log(functionName + ` API Response: ${JSON.stringify(res)} \nFlattened: ${JSON.stringify(flatList)}`);
-
-        const foundItem = flatList.find(item => item.productId === productId);
-
-        if (foundItem) {
-          console.log(functionName + ` Found matching item: ${JSON.stringify(foundItem)}`);
-          observer.next(foundItem.itemsRemaining);
-        } else {
-          console.warn(functionName + ` No item found for productId [${productId}]. Returning default: ${defaultValue}`);
-          observer.next(defaultValue);
-        }
-
-        observer.complete();
-      },
-      error: (err) => {
-        console.error(functionName + ` Error during getAvailableItems(): ${err}`);
-        observer.next(defaultValue);
-        observer.complete();
-      }
-    });
-  });
-}
-
-getProductPriceById(productId:number):number{
-  let defaultValues= 0;
-
-
-  if(this.productList){
-
-
-    for(let a of this.productList){
-
-      if(productId === a.productId){
-
-        return a.productPrice;
-      }
-
-    }
-
-  }else{
-    this.getProductList().subscribe( 
-      data=>{
-        console.log("getting productlist by Id");
-
-        for(let a of data.data){
-
-      if(productId === a.productId){
-        console.log("found Matching product by ID");
-        return a.productPrice;
-      }
-
-    }
-        return defaultValues;
-    })
+  private getPricing(productId: number): ProductPricing | undefined {
+    return this.productPricingList.find(p => Number(p.productId) === Number(productId));
   }
 
-
-  return defaultValues;
-
-}
-
-getYummyListById(product : YummyList):YummyList{
-
-  const functionName = "getYummyListById"
-  console.log(functionName+` getYummyListById productList: ${JSON.stringify(product)} yummylis ${this.yummyList}`)
-
-  const productId = product.productId;
-    let de : YummyList ={
-    productId: product.productId,
-    productName: product.productName,
-    productFlavor: product.productFlavor,
-    productPrice: product.productPrice,
-    productSize: product.productSize,
-    productQuantity: product.productQuantity,
-    costPerItem: product.costPerItem,
-    productProfit: product.productProfit,
-    sellingPrice: product.sellingPrice,
-    productCommission: product.productCommission,
-    itemGrouping: product.itemGrouping ||1
+  private setYummyList(list: YummyList[]): void {
+    this.yummyList.splice(0, this.yummyList.length, ...list); // in place – keeps existing references valid
   }
-  console.log(functionName+` done creating yummylist ${JSON.stringify(de)} }`)
 
-  return de;
-}
- hashCode(str:string) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0; // Convert to 32bit integer
+  private upsertLocalAvailable(item: AvailableItems): void {
+    const i = this.availableItems.findIndex(a => Number(a.productId) === Number(item.productId));
+    if (i >= 0) this.availableItems[i] = item; else this.availableItems.push(item);
+    this.availableItems$.next([...this.availableItems]);
   }
-  return hash;
-}
 
-getProductPricing_HTTP(): Observable<ApiResponse<ProductPricing[]>> {
-//  return this.http.get<ApiResponse<ProductPricing[]>>('/api/pricing');
-  return this.httpClientService.get<ApiResponse<ProductPricing[]>>(`${this.apiUrl}/getProductPricing`)
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  PRODUCT-ID GENERATION  (FIX #3 – the "auto increment is failing / duplicates" problem)
+  // ═══════════════════════════════════════════════════════════════════
 
+  /**
+   * Pure calculation: next free id = max(existing ids) + 1.
+   *
+   * Old logic scanned for the first gap starting at 1 and compared `p.productId === x`. That breaks when
+   *   - ids arrive as strings ("1" !== 1) -> always returned 1 -> duplicate key
+   *   - the list already contains a duplicate id -> the scan returned an id that was already used
+   *   - deleted ids get re-used while orphan rows for them still exist in other tables
+   */
+  computeNextProductId(list: ProductList[]): number {
+    const ids = (list ?? [])
+      .map(p => Number(p.productId))
+      .filter(n => Number.isFinite(n) && n > 0);
+    return ids.length ? Math.max(...ids) + 1 : 1;
+  }
 
-generateStockId():number {
-  const now = new Date();
-  const timestamp = now.getTime();
-  const randomPart = Math.random().toString(36).substring(2, 8); // Random string
-  const uniqueString = `${timestamp}-${randomPart}`;
-  const hashedId = Math.abs(this.hashCode(uniqueString))
+  /** Same name as before; now also keeps nextProductId_universal and the subject in sync. */
+  generateProductID_Index(productList: ProductList[]): number {
+    const next = this.computeNextProductId(productList);
+    this.nextProductId_universal = next;
+    this.universalNextProductId$.next(next);
+    return next;
+  }
 
-  return this.convertToNumber(hashedId);
-}
+  /**
+   * Use this right before adding a product. It never hands out the same id twice in one session,
+   * even if the list has not been reloaded since the last add.
+   * (Real fix long-term: let the DB AUTO_INCREMENT the id and return insertId from the API.)
+   */
+  reserveNextProductId(): number {
+    const id = Math.max(this.computeNextProductId(this.productList), this.nextProductId_universal, 1);
+    this.nextProductId_universal = id + 1;
+    this.universalNextProductId$.next(id + 1);
+    return id;
+  }
 
-
-newStockedItems:StockedItems[]=[]; 
-newAvailableItems:AvailableItems[]=[];
-
-
-
-finalizeNewStock(newStockItems: AddNewStock[]) {
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Start processing new stock items:", newStockItems);
-
-  let tempSockId = this.generateStockId();
-  let totalCost = 0;
-  let newStockQuantity = 0;
-
-  if (newStockItems) {
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Value for checkedItems", newStockItems);
-
-    for (let stock of newStockItems) {
-      // Create Total Cost
-      totalCost = stock.productPrice * stock.numOfPacks;
-      // Increment Available Stock
-      newStockQuantity = stock.numOfPacks * stock.productQuantity;
-
-      let items: StockedItems = {
-        stockId: tempSockId,
-        productId: stock.productId,
-        stockDate: stock.lastUpdated,
-        stockPrice: totalCost,
-        stockQuantity: newStockQuantity
-      };
-
-      let availItems: AvailableItems = {
-        productId: stock.productId,
-        itemsRemaining: stock.availableItems + items.stockQuantity,
-        lastUpdated: this.dateTimeService.normalizeDate(stock.lastUpdated)
-      };
-
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Generated new AvailableItems:", availItems);
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Generated new StockedItems:", items);
-
-      this.newAvailableItems.push(availItems);
-      this.newStockedItems.push(items);
-    }
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Done generating new StockedItems:", this.newStockedItems);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] Done appending new AvailableItems:", this.newAvailableItems);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] End of initial processing");
-  } // End of finalizeNewStock
-
-  // Generate StockID
-
-  for (let a of this.newStockedItems) {
-    console.log(`[finalizeNewStock] Adding new StockedItem to DB:`, a);
-    // Adding New Stock
-    this.addStockedItems_HTTP(a).subscribe(
-      res => {
-        console.log(`[finalizeNewStock] Successfully added StockedItem for productId ${a.productId}. Clearing newStockedItems and checkedItems arrays.`);
-      //  this.newStockedItems.splice(0);
-      //  this.checkedItems.splice(0);
-
-        // Updating Increased available Items
-        for (let b of this.newAvailableItems) {
-          if (a.productId === b.productId) {
-            // If the Available Item doesn't exist, add a new
-            if (!this.checkForAvailableItems(b.productId)) {
-              console.log(`[finalizeNewStock] Product Id [${b.productId}] Not Found, Adding new AvailableItems`);
-              
-              this.addAvailableItems(b).subscribe(
-                res => {
-                  console.log(`[finalizeNewStock] Done adding Stock Items and AvailableItems for productId ${b.productId} with response ` + res);
-                },
-                error => {
-                  console.error(`[finalizeNewStock] Error adding AvailableItems for productId ${b.productId}:`, error);
-                }
-              );
-            } else {
-              console.log(`[finalizeNewStock] Found Product Id [${b.productId}], Updating AvailableItems with response ` + res);
-              // If available Item exists, Update the Item
-              this.updateAvailableItems(b).subscribe(
-                res => {
-                  this.clearMatTable();
-                  console.log(`[finalizeNewStock] Product Id [${b.productId}] was successfully updated with response ` + res);
-                },
-                error => {
-                  console.error(`[finalizeNewStock] Error updating AvailableItems for productId ${b.productId}:`, error);
-                }
-              );
-            }
-          }
-        }
-      },
-      error => {
-        console.error(`[finalizeNewStock] Error adding StockedItem for productId ${a.productId}:`, error.message);
-      }
+  /**
+   * FIX #3b: the old version returned `of(newIndex)` before the subscribe had produced anything (always 0),
+   * indexed `productList[length]` (TypeError) and mutated the loop variable inside a log template.
+   */
+  generateNewProductID_Index(): Observable<number> {
+    return this.getProductList().pipe(
+      map(res => this.computeNextProductId(this.coerce<ProductList>(this.unwrap(res), ['productId'])))
     );
-    
   }
 
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": [finalizeNewStock] All operations completed.");
-}
-
-
-createAvailableItemsById(_productId:number): AvailableItems {
-
-  
-  let foundProductId = 0;
-  let foundAvailableItems : AvailableItems ={
-    productId: 0,
-    itemsRemaining: 0,
-    lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
+  /** Returns a human readable reason if the product would be a duplicate, otherwise null. */
+  findDuplicateProduct(p: ProductList): string | null {
+    const id = Number(p.productId);
+    if (this.productList.some(x => Number(x.productId) === id)) {
+      return `Product id ${id} already exists`;
+    }
+    const norm = (s: any) => String(s ?? '').trim().toLowerCase();
+    if (this.productList.some(x => norm(x.productName) === norm(p.productName) && norm(x.productFlavor) === norm(p.productFlavor))) {
+      return `Product "${p.productName} ${p.productFlavor}" already exists`;
+    }
+    return null;
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  //  ADD NEW CANDY
+  // ═══════════════════════════════════════════════════════════════════
 
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Available Items Array ", this.availableItems);
+  addNewCandy(
+    addProductListRequest: ProductList,
+    addProductPricingRequest: ProductPricing,
+    addAvailableItemsRequest: AvailableItems,
+    addPriceTracing: PriceTracing
+  ): Observable<any> {
+    const dup = this.findDuplicateProduct(addProductListRequest);
+    if (dup) return throwError(() => new Error(dup));
 
-  if(this.availableItems && this.availableItems.length > 0){
+    const body = { addProductListRequest, addProductPricingRequest, addAvailableItemsRequest, addPriceTracing };
+    return this.http.post(this.url('addNewCandy'), body);
+  }
 
-    for(let _availableItems of this.availableItems){
+  /**
+   * FIX #7: the old code put a FormData object inside a JSON body – JSON.stringify(FormData) is `{}`,
+   * so the image never reached the server. Now everything is sent as multipart/form-data.
+   * Backend: parse the four JSON fields with JSON.parse (multer `upload.single('image')` etc.).
+   */
+  addNewCandy_with_image(
+    addProductListRequest: ProductList,
+    addProductPricingRequest: ProductPricing,
+    addAvailableItemsRequest: AvailableItems,
+    addPriceTracing: PriceTracing,
+    formData: FormData
+  ): Observable<any> {
+    const dup = this.findDuplicateProduct(addProductListRequest);
+    if (dup) return throwError(() => new Error(dup));
 
-       
-       
+    formData.set('addProductListRequest', JSON.stringify(addProductListRequest));
+    formData.set('addProductPricingRequest', JSON.stringify(addProductPricingRequest));
+    formData.set('addAvailableItemsRequest', JSON.stringify(addAvailableItemsRequest));
+    formData.set('addPriceTracing', JSON.stringify(addPriceTracing));
+    return this.http.post(this.url('addNewCandy_with_image'), formData);
+  }
 
-          if(_availableItems.productId === _productId){
-             console.log(this.dateTimeService.formatPartial(Date.now()) + ": Product Id Found:" + _productId + " data: " + JSON.stringify(_availableItems))
+  // ═══════════════════════════════════════════════════════════════════
+  //  LOADING  (FIX #4 – the two loaders are now one)
+  // ═══════════════════════════════════════════════════════════════════
 
-            foundProductId = _availableItems.productId;
-            
+  /**
+   * Cold observable that loads everything once and fills the state. Subscribe to it if you need to know
+   * when loading is done. Errors are already reported to the snackbar.
+   */
+  loadAll$(quiet = false): Observable<boolean> {
+    return defer(() => {
+      this.loaderBounceService.setLoaderBouceStatus(true);
+      this.loadDataButtonState = false;
+      this.loadSpinner = true;
+      this.productListToShowOnCheckBox_AddNew.splice(0);
+      this.productPricingOnCheckBox_newStock.splice(0);
 
-
-            return _availableItems;
+      return forkJoin({
+        pricing: this.getProductPricing(),
+        products: this.getProductList(),
+        estimates: this.getEstimates(),
+        priceTracing: this.getPriceTracing(),
+        available: this.getAvailableItems(),
+        sodEod: this.getSodEod(''),
+        itemPricing: this.getProductItemPricing_HTTP()
+      }).pipe(
+        tap({
+          next: res => this.applyLoadedData(res, quiet),
+          error: err => {
+            this.loadDataButtonState = false;
+            this.showError(err);
+            console.error('❌ Error loading product data', err);
           }
-
-    }
-
-  }else{
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": createAvailableItemsById did not find any");
-
-  }
-
-
-
-  return foundAvailableItems;
-
-}
-
-
-createAvailableItems_SodEod(sod_eod:MatTableSOD_EOD, availableItems:AvailableItems):AvailableItems{
-
-  let availableItems_productId_Old = availableItems.productId; 
-  let availableItems_Old = availableItems.itemsRemaining
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now creating sod eod available items for prodId[" +availableItems_productId_Old+"]");
-  let _sod_eod:SOD_EOD ={
-    productId: sod_eod.productId,
-    itemsTaken: sod_eod.itemsTaken,
-    itemsRemaining: sod_eod.itemsRemaining,
-    lastUpdated: this.dateTimeService.normalizeDate(sod_eod.date),
-    productName: sod_eod.productName
-  }
-
-
-
-  let availableItems_SodEod:AvailableItems ={
-    productId: sod_eod.productId,
-    itemsRemaining: availableItems_Old - (_sod_eod.itemsTaken - _sod_eod.itemsRemaining),
-    lastUpdated: sod_eod.date
-  }
-
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done with sod eod available items for prodId[" +availableItems_productId_Old+"]", availableItems_SodEod);
-
-  
-  return availableItems_SodEod;
-
-}
-
-createSodEod(sod_eod:MatTableSOD_EOD):SOD_EOD{
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Creating SOD_EOD", sod_eod);
-  let updatedSodEod:SOD_EOD ={
-    productId: sod_eod.productId,
-    itemsTaken: sod_eod.itemsTaken,
-    itemsRemaining: sod_eod.itemsRemaining,
-    lastUpdated: sod_eod.date,
-    productName: sod_eod.productName
-  }
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done SOD_EOD...!", updatedSodEod);
-
-  return updatedSodEod;
-}
-
-
-getProductNameById(productId:number):string
-{
-  let _productName ="";
-  this.getProductNameById_http(productId).subscribe(productName => {
-  console.log('Product Name:', productName);
-  return productName;
-
-});
-
-
-return _productName;
-}
-
-getProductNameById_http(productId: number): Observable<string> {
-  const functionName = `${this.dateTimeService.normalizeDate(Date.now())} getProductNameById Started...`;
-  const defaultName = 'Unknown';
-
-  return new Observable<string>((observer) => {
-    this.getProductList().subscribe({
-      next: (response) => {
-        console.log(functionName + ' Raw response: ' + JSON.stringify(response));
-
-        const flatList = ResponseUtils.extractFirstArrayFromNested<ProductList>(response);
-        console.log(functionName + ' Flattened: ' + JSON.stringify(flatList));
-
-        const matched = flatList.find(p => p.productId === productId);
-
-        if (matched) {
-          console.log(functionName + ` Found: ${matched.productName}`);
-          observer.next(matched.productName);
-        } else {
-          console.warn(functionName + ` No match for productId: ${productId}`);
-          observer.next(defaultName);
-        }
-
-        observer.complete();
-      },
-      error: (err) => {
-        console.error(functionName + ` Error: ${err}`);
-        observer.next(defaultName);
-        observer.complete();
-      }
+        }),
+        map(() => true),
+        // FIX #4: the old getAllDetailss() switched the loader OFF synchronously, before any data arrived.
+        finalize(() => {
+          this.loadSpinner = false;
+          this.loaderBounceService.setLoaderBouceStatus(false);
+        })
+      );
     });
-  });
-}
-
-sendProducts(products: ProductList[]) {
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending Products to R1 DB API", products);
-  const apiUrl = 'https://ai-worker-hono.lucky-sebothoma-3.workers.dev/api/r2';
-  const headers = new HttpHeaders({
-    'Content-Type': 'application/json'
-  });
-
-  return this.http.post(apiUrl, products, { headers, responseType: 'text' });
-}
-
-createNewStockMatTable(product: ProductList, yummyList: YummyList): AddNewStock {
-  const functionName =`${this.dateTimeService.normalizeDate(Date.now())} createNewStockMatTable`
-    console.log(functionName +`createNewStockMatTable Product List ${JSON.stringify(product)} YummyList ${JSON.stringify(yummyList)}`)
-
-   console.log(functionName +": Newly Created, to view product List", product);
-   console.log(functionName + ": Newly Created, to view yummyList List", yummyList);
-  const availableItems = this.getAvaialableItemsById(product.productId);
-  console.log(functionName + "DOne assigning available Item with ", availableItems)
-  let lastUpdated = this.dateTimeService.normalizeDate(new Date());
-  let price: number = this.getProductPriceById(product.productId);
-  const productId = yummyList.productId
-  const productPrice =JSON.stringify(yummyList.productPrice);
-  const productQuantity = JSON.stringify(yummyList.productQuantity);
-
-  let addNewData : AddNewStock ={
-    productId: productId,
-    productName: this.getProductNameById(productId),
-    productPrice: parseFloat(productPrice),
-    numOfPacks: 1,
-    lastUpdated: this.dateTimeService.normalizeDate(Date.now()),
-    productQuantity: parseInt(productQuantity),
-    availableItems: availableItems,
-    date: lastUpdated
   }
 
-   console.log(functionName + ": Done Creating createNewStockMatTable", addNewData);
-
-  return addNewData;
-   
+  /** Returns true when the load was *started* (the load itself is asynchronous – use loadAll$() to await it). */
+  loadAllProductDetails(quiet = false): boolean {
+    this.loadAll$(quiet).subscribe({ error: () => { /* already reported in loadAll$ */ } });
+    return true;
   }
 
-spliceMatTableOfSOD_EOD(indexFound: number):void{
-        let temp : MatTableSOD_EOD []=[];
-        temp = this.checkBoxSelectedProducts.splice(indexFound, 1);
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Spliced Mat SOD_EOD Table",temp );
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Spliced checkBoxSelectedProducts",this.checkBoxSelectedProducts.splice(indexFound, 1) );
+  /** @deprecated duplicate of loadAllProductDetails(); kept so existing callers still compile. */
+  getAllDetailss(): boolean {
+    return this.loadAllProductDetails();
+  }
 
-           // Update the MatTableDataSource data
-//        this.checkBoxSelectedProducts.data = temp;
-  //       this.checkBoxSelectedProducts.data= [...this.checkBoxSelectedProducts.data];
+  private applyLoadedData(res: any, quiet: boolean): void {
+    const pricing = this.coerce<ProductPricing>(this.unwrap(res.pricing),
+      ['productId', 'productQuantity', 'costPerItem', 'productProfit', 'sellingPrice', 'productCommission', 'itemGrouping']);
+    const products = this.coerce<ProductList>(this.unwrap(res.products), ['productId', 'productPrice']);
+    const estimates = this.coerce<EstimatedPricing>(this.unwrap(res.estimates), ['productId', 'estimatedSelling', 'actualSelling']);
+    const tracing = this.coerce<PriceTracing>(this.unwrap(res.priceTracing), ['productId', 'accAmount']);
+    const available = this.coerce<AvailableItems>(this.unwrap(res.available), ['productId', 'itemsRemaining']);
+    const sodEod = this.coerce<SOD_EOD>(this.unwrap(res.sodEod), ['productId', 'itemsTaken', 'itemsRemaining']);
+    const itemPricing = this.coerce<ProductItemPricing>(this.unwrap(res.itemPricing),
+      ['productId', 'itemsRemainder', 'costOfRemainder', 'groupedQuantity', 'groupedProfit', 'groupedCommission', 'itemGroup']);
 
-          console.log(this.dateTimeService.formatPartial(Date.now()) + ": Index [" + indexFound + "] Removed From Mat Table");
+    // local copies
+    this.productPricingList = pricing;
+    this.productList = products;
+    this.priceEstimates = estimates;          // FIX #5: was never assigned -> searchProductId_inEstimates always false
+    this.priceTracingList = tracing;
+    this.availableItems = available;
+    this.sod_eod_list = sodEod;
+    this.productItemPricingList = itemPricing;
 
-         /// Add de select checkbox
+    // subjects (FIX #4: getAllDetailss never pushed these, so sourceOfTruth lookups returned -1)
+    this.productPricing$.next(pricing);
+    this.productList$.next(products);
+    this.productEstimates$.next(estimates);
+    this.productPriceTracing$.next(tracing);
+    this.availableItems$.next(available);
+    this.sodEodList$.next(sodEod);
+    this.productItemPricing$.next(itemPricing);
 
+    // FIX #3: also set when the list is empty (old getAllDetailss left it at 0, loadAll left the subject at -1)
+    this.generateProductID_Index(products);
 
+    // FIX #8: build the tables whenever there ARE products. Old code required available items too, so a
+    // fresh DB with products but no stock produced an empty checklist.
+    this.createSodEodMatTable(products, available);
 
-}
+    if (products.length && pricing.length) {
+      this.setYummyList(this.createYummyListArray(products, pricing));
+    } else {
+      this.overViewList = [];
+      this.setYummyList([]);
+    }
 
-showLoading(message: string): void {
-  setTimeout(() => {
-    this.snackBar.open(JSON.stringify(message), 'Close', {
-      duration: 0,
-      horizontalPosition: 'right',
-      verticalPosition: 'top'
+    this.loadDataButtonState = true;
+    if (!quiet) this.showSuccess('✅ Product data loaded successfully');
+  }
+
+  getProductsHttpCall(): ProductList[] {
+    this.getProductList().subscribe(data => {
+      this.productList = this.coerce<ProductList>(this.unwrap(data), ['productId', 'productPrice']);
     });
-  });
-}
+    return this.productList; // NOTE: returns the *current* list; it is refreshed asynchronously
+  }
 
-hideLoading(): void {
-  this.snackBar.dismiss(); // no need to defer this
-}
+  // ═══════════════════════════════════════════════════════════════════
+  //  SOD/EOD TABLES  (FIX #8 – duplicates on every reload)
+  // ═══════════════════════════════════════════════════════════════════
 
-showSuccess(message: any): void {
-  setTimeout(() => {
-    this.snackBar.open(JSON.stringify(message), 'Close', {
-      duration: this.snackBarDuration_Success,
-      horizontalPosition: 'right',
-      verticalPosition: 'top'
+  /**
+   * The old version PUSHED into productListOnStock / OutOfStock / UnCaptured / stockAvailability without
+   * clearing them, and getAllDetailss called it twice per load -> every product appeared 2x, 3x, 4x...
+   * We now rebuild from scratch (in place, so aliases held by components stay valid).
+   */
+  createSodEodMatTable(productList: ProductList[], availableItems: AvailableItems[]): void {
+    this.productListOutOfStock.length = 0;
+    this.productListOnStock.length = 0;
+    this.productListUnCaptured.length = 0;
+    this.stockAvailability.length = 0;
+
+    const availById = new Map<number, AvailableItems>();
+    for (const a of availableItems ?? []) {
+      const id = Number(a.productId);
+      if (!availById.has(id)) availById.set(id, a);
+    }
+
+    const row = (p: ProductList, itemsRemaining: number, availableCount: number, outOfStock: boolean): MatTableSOD_EOD => ({
+      productId: Number(p.productId),
+      itemsTaken: 0,
+      itemsRemaining,
+      date: this.ClickedCalenderDate,
+      productName: `${p.productName}-${p.productFlavor}`,
+      availableItems: availableCount,
+      outOfStock,
+      sellingPrice: this.getSellingPrice(Number(p.productId))
     });
-  });
-}
 
-showError(message: string): void {
-  setTimeout(() => {
-    this.snackBar.open(JSON.stringify(message), 'Close', {
-      duration: this.snackBarDuration_Failure,
-      horizontalPosition: 'center',
-      verticalPosition: 'bottom'
-    });
-  });
-}
-
-generateNewProductID_Index(): Observable<number> {
-  const functionName = `${this.dateTimeService.normalizeDate(Date.now())} generateNewProductID_Index`;
-
-     console.log(`${functionName} +  generateNewProductID_Index: productList to prepare`);
-
-     let newIndex = 0;
-     this.getProductList().subscribe({
-  
-      next: (response: any) => {
-
-          console.log(` ${functionName} generateNewProductID_Index : ${response}`);
-          console.log(` ${functionName} generateNewProductID_Index stringified: ${JSON.stringify(response)}`);
-
-          // Check if response has a 'data' property (API returns an object)
-          const productList = Array.isArray(response) ? response : response?.data || [];
-
-
-        // handle productList here if needed
-        const productLength = productList.length;
-
-        console.table(` ${functionName} generateNewProductID_Index :${productList}`)
-        for(let x=1;x<=productLength;x++){
-            let productToBeAccesed = productList[x].productId;
-            console.log(` ${functionName} Product Id Index to be processed:[ ${productToBeAccesed} ]`);
-
-            if(productToBeAccesed == x){
-            console.log(` ${functionName} Product Id Index [ ${productToBeAccesed} ]  Found ..!]`);
-                newIndex = x;
-            break;
-            }
-
-            console.log(`${functionName} Product Id Index [ ${productToBeAccesed} ]  Missed ..! Exisit next index [${x++}]`);
-        }
-        // No return statement needed here
+    for (const p of productList ?? []) {
+      const a = availById.get(Number(p.productId));
+      if (!a) {
+        const r = row(p, 0, -1, true);
+        this.productListUnCaptured.push(r);
+        this.stockAvailability.push(r);
+      } else if (Number(a.itemsRemaining) <= 0) {
+        const r = row(p, Number(a.itemsRemaining), Number(a.itemsRemaining), true);
+        this.productListOutOfStock.push(r);
+        this.stockAvailability.push(r);
+      } else {
+        const r = row(p, 0, Number(a.itemsRemaining), false);
+        this.productListOnStock.push(r);
+        this.stockAvailability.push(r);
       }
-     })
-
-
-     return of(newIndex);
-}
-
-
-generateProductID_Index(productList: ProductList[]): number {
-  const functionName = `${this.dateTimeService.normalizeDate(Date.now())} generateProductID_Index`;
-  const existingProductIds = new Set(productList.map(product => product.productId));
-
-  const objLength = productList.length;
-  let returnProductId: number = -1; // Start with -1 to clearly identify unassigned state
-
-//  console.log(`${this.dateTimeService.formatPartial(Date.now())} : generateProductID_Index: Received productList of length ${objLength}`);
-//  console.log(`${this.dateTimeService.formatPartial(Date.now())} : Existing product IDs: [${[...existingProductIds].sort((a, b) => a - b).join(', ')}]`);
-    console.log(` ${functionName} : exisiting Products obj len ${objLength} passed productList [${JSON.stringify(productList)}]`)
-
-  // Look for the fil x=0;rst missing productId starting from 1
-  
-  let x =1;
-  for (let p of productList) {
-    if(p.productId === x ){}
-    else{
-      this.universalNextProductId$.next(x);
-      returnProductId = x;
-      console.log(`${functionName} Product Id[${x}] found and will be assigned:`)
-
-      return x;
-    }
-    x++;
-
-  }
-
-  // If all product IDs are used, assign the next available
-  if (returnProductId <= 0) {
-    returnProductId = objLength + 1;
-    console.log(`${functionName}: All IDs in range used. Assigning next available ID: ${returnProductId}`);
-  }
-
-  // Final safeguard
-  if (returnProductId <= 0) {
-    throw new Error(`${functionName} : ❌ Invalid Product ID generated: ${returnProductId}`);
-  }
-
-  console.log(`${functionName}: ✅ Returning Product ID: ${returnProductId} as final`);
-  return returnProductId;
-}
-
-
-
-removeSodEodByProductId(productId:number): void{ 
-
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now deleing data row on mat table \n Receveived Product Id =>", productId);
-  const foundProductIndex = this.dataSourceSodEod.data.findIndex((MatTableObj: { productId: number; }) => MatTableObj.productId === productId);
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": foundProductIndex :" + foundProductIndex);
-  this.dataSourceSodEod.data.splice(foundProductIndex, 1);
-  this.dataSourceSodEod._updateChangeSubscription();
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": After deleting data row on mat table \n Receveived Product Id =>", productId);
-
-  console.log(Date.now + " *********x :");
-}
-showOnMatTable(operation:string): void{
-
-
-  let dateFound =false;
-  const sod_eod_length = this.sod_eod_list.length;
-
-  if(operation === "SodEod")
-    {
-   
-      if(sod_eod_length > 0){
-    
-              /// Write to dba because no reords was found that matches the date
-              // Based on Stock Availabel List
-               console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending data for final inspetion to sent to database");
-              const tableData: MatTableSOD_EOD[] = this.checkBoxSelectedProducts.slice();
-              let sodEod_availableItems: AvailableItems[]=[];
-              for(let sod_eodTable of tableData){
-                  let productId = sod_eodTable.productId;
-                for(let aItems of this.availableItems){
-      
-                  if(aItems.productId === productId){
-                    // get Array of that 
-                    sodEod_availableItems.push(aItems);
-      
-                  }
-      
-                }
-              }
-                this.debitCreditAvailableItems(sodEod_availableItems,tableData,"SodEod" );
-        
-        console.log();
-
-
-
-      }else{
-
-        
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Nothing on the report, We good to send for DB Storage" );
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending data for final inspetion to sent to database");
-        //const tableData: MatTableSOD_EOD[] = this.checkBoxSelectedProducts.slice();
-    
-        let tableData:MatTableSOD_EOD[] = this.dataSourceSodEod.data.slice();
-        let sodEod_availableItems: AvailableItems[]=[];
-        for(let sod_eodTable of tableData){
-            let productId = sod_eodTable.productId;
-          for(let aItems of this.availableItems){
-
-            if(aItems.productId === productId){
-              // get Array of that 
-              sodEod_availableItems.push(aItems);
-
-            }
-
-          }
-        }
-
-          this.debitCreditAvailableItems(sodEod_availableItems,tableData,"SodEod" );
-      }
-
-      
-  }else if(operation === "AddNew"){
-    if(sod_eod_length > 0){
-
-      for( let sod_eod of this.sod_eod_list ){
-  
-        console.log(sod_eod);
-  
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now Comparing sod_eod.date ===this.ClickedCalenderDate " + sod_eod.lastUpdated+"===" + this.ClickedCalenderDate);
-        
-          if(this.ClickedCalenderDate === sod_eod.lastUpdated){
-  
-            console.log(this.dateTimeService.formatPartial(Date.now()) + ":  "+"Date was found : ", this.ClickedCalenderDate );
-  
-            dateFound = true;
-          break;
-          }
-      }
-      if(dateFound === true){
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Ask for differnet Option")
-  
-        // Choos Different date message
-      }else{
-  
-            /// Write to dba because no reords was found that matches the date
-            // Based on Stock Availabel List
-             console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending data for final inspetion to sent to database");
-            const tableData: AddNewStock[] = this.checkBoxSelectedProducts_AddNew.data.slice();
-            let sodEod_availableItems: AvailableItems[]=[];
-
-            for(let sod_eodTable of tableData){
-                let productId = sod_eodTable.productId;
-              for(let aItems of this.availableItems){
-
-                if(aItems.productId === productId){
-                  // get Array of that 
-                  sodEod_availableItems.push(aItems);
-  
-                }
-  
-              }
-            }
-              this.debitCreditAvailableItems(sodEod_availableItems,tableData,"AddNew" );
-      }
-      console.log();
-    }else{
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Nothing on the report, We good to send for DB Storage" );
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Sending checkBoxSelectedProducts_AddNew for final inspetion to sent to database");
-
-        
-        this.debitCreditAvailableItems(this.availableItems,this.checkBoxSelectedProducts_AddNew.data.slice(),"AddNew" );
     }
 
-  }else{
-    this.showError("Invalid Operaion");
+    this.productListToShowOnCheckBox_AddNew = this.stockAvailability;
+    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(this.stockAvailability);
   }
 
-
-
-
-
-
-  // const tableData: SOD_EOD[] = this.selectedProducts.data;
-   //this.debitCreditAvailableItems(this.availableItems,tableData );
-}
-
-updateSodEod(productList:SOD_EOD) : Observable<void[]>{
-
-  this.fullApiUrl = this.apiUrl + "updateSodEodItems";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateSodEod():" +  this.fullApiUrl);
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Daa to be sent to updateSodEod", productList)
-
-  return  this.http.put<void[]> (this.fullApiUrl, productList);
-   
-}
-
-updateProductListByID(api:string,productList:ProductList) : Observable<void[]>{
-
-  this.fullApiUrl = this.apiUrl + "updateProductList";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateProductListByID():" +  this.fullApiUrl);
-
-  return  this.http.put<void[]> (this.fullApiUrl, productList) ;
-  
-}
-
-addYummies(productPricing:productPricing) : Observable<void[]>{
-
-
-  this.fullApiUrl =  this.apiUrl + "add2Pricing";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for addYummies():" +  this.fullApiUrl);
-
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": DAta to be added");
-  console.log(productPricing);
-
-  return  this.http.post<void[]> (this.apiUrl, productPricing) ;
-  
-}
-
-formatDate(dateString: any): Date {
-
-
-  return this.dateTimeService.normalizeDate(dateString);
- 
-}
-
-getLastUpdateOnAvailableItems(productId:number): any{
-
-
-if(this.availableItems.length > 0 ){
-
-  for(let aItems of this.availableItems){
-
-    if(productId === aItems.productId){
-      return aItems.lastUpdated;
-
-    }
-  }
-}
-
-
-return this.dateTimeService.formatDate(Date.now(),"mysql")
-}
-getavailableitems(productId:number): number{
-let availableItems = -1;
-
-if(this.availableItems.length > 0 ){
-
-  for(let aItems of this.availableItems){
-
-    if(productId === aItems.productId){
-      availableItems = aItems.itemsRemaining;
-
-    }
-  }
-}
-
-
-return availableItems
-}
-
-sendDataSourceSodEod():void{
-  let response: any[]=[];
-  const temp = ResponseUtils.extractFirstArrayFromNested<MatTableSOD_EOD>(this.dataSourceSodEod.data.slice()); 
-   console.log(this.dateTimeService.formatPartial(Date.now()) + " sendDataSourceSodEod: Sending data for final inspetion to sent to database");
-   console.log(this.dateTimeService.formatPartial(Date.now()) + "sendDataSourceSodEod : DataSourceSodEod", temp )
-  this.getAvailableItems().subscribe(
-    res =>{
-      response = ResponseUtils.extractFirstArrayFromNested<AvailableItems>(res);
-        this.debitCreditAvailableItems(response,temp,"SodEod" );
-
-    }
-
-  )
-
-
-
-}
-
-addSodEod(sodEodList:SOD_EOD) : Observable<void[]>{
-  this.fullApiUrl = this.apiUrl + "addSodEodItems";
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for addSodEod():" +  this.fullApiUrl);
-
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": DAta to be added");
-  console.log(sodEodList);
-
-  return  this.http.post<void[]> (this.fullApiUrl, sodEodList);
-  
-}
-
-getSodEod(api:string) : Observable<ApiResponse<SOD_EOD[]>>{
-
-  this.fullApiUrl = this.apiUrl + "getSodEodItems";
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getSodEod():" + this.fullApiUrl );
-  return this.http.get<ApiResponse<SOD_EOD[]>> (this.fullApiUrl) ;
-
-}
-
-getSodEodList() : Observable<MatTableSOD_EOD[]>{
-
-  this.fullApiUrl = this.apiUrl + "getSodEodList";
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getSodEod():" + this.fullApiUrl );
-  return this.http.get<MatTableSOD_EOD[]> (this.fullApiUrl) ;
-
-}
-
-  getProductPricing() : Observable<ApiResponse<ProductPricing[]>> {
-
-    this.fullApiUrl = this.apiUrl + "getallpricing";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getProductPricing(): " +  this.fullApiUrl);
-    //return this.http.get<ApiResponse<ProductPricing[]>>(this.fullApiUrl) ;
-    return this.httpClientService.get<ApiResponse<ProductPricing[]>>("/getallpricing", {},"productPricing")
-
-}
-
-  viewProducts(products:Product): void{
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Viewing Pruducts: " + products);
-  }
-  getProductListByProductId(_productId:number): ProductList{
-
-    let temp: ProductList = {
-      productId: 0,
-      productName: '',
-      productFlavor: '',
-      productPrice: 0,
-      image_url: ''
+  checkBox_SOD_EOD_productToShow(operation: string): void {
+    const sources: Record<string, MatTableSOD_EOD[]> = {
+      productListUnCaptured: this.productListUnCaptured,
+      productListOnStock: this.productListOnStock,
+      productListOutOfStock: this.productListOutOfStock,
+      stockAvailability: this.stockAvailability
     };
 
-    if(this.productList.length > 0){
+    if (operation !== 'matCheckbox' && !sources[operation]) {
+      console.error('checkBox_SOD_EOD_productToShow: invalid operation type: ' + operation);
+      return;
+    }
 
-      for(let p of this.productList){
+    this.dataSourceSodEod.data.splice(0);
+    this.checkBoxSelectedProducts.splice(0);
+    this.dataSourceSodEod._updateChangeSubscription();
 
-        if(p.productId === _productId){
-           temp = p;
+    if (operation === 'matCheckbox') {
+      this.productToShowOnCheckBox = [];
+      return;
+    }
+
+    const list = sources[operation];
+    this.productToShowOnCheckBox = list;
+    this.productListToShowOnCheckBox_AddNew = list;
+    this.productPricingOnCheckBox_newStock = PricingConverter.arrayToProductPricing(list);
+  }
+
+  createProductPricing(someList: MatTableSOD_EOD[]): ProductPricing[] {
+    const out: ProductPricing[] = [];
+    for (const item of someList ?? []) {
+      const p = this.getPricing(item.productId);
+      if (p) out.push(p); // one pricing row per product – no duplicates
+    }
+    return out;
+  }
+
+  ShowUnCaptured(): void {
+    this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListUnCaptured);
+  }
+
+  // FIX #9: was using productListUnCaptured (copy/paste from ShowUnCaptured)
+  outOfStockOnly(): void {
+    this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListOutOfStock);
+  }
+
+  AvailableStockOnly(): void {
+    this.productPricingOnCheckBox_newStock = this.createProductPricing(this.productListOnStock);
+  }
+
+  ShowAll(): void {
+    this.productPricingOnCheckBox_newStock = this.createProductPricing(this.stockAvailability);
+  }
+
+  clearMatTable(): void {
+    this.dataSourceSodEod.data.splice(0);
+    this.dataSourceSodEod._updateChangeSubscription();
+  }
+
+  clearMatTableSodEod(): void {
+    this.checkedItems.splice(0);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CHECKBOX HANDLING
+  // ═══════════════════════════════════════════════════════════════════
+
+  updateSelectedProducts(event: any, product: YummyList, index: number, operation: string): void {
+    const isChecked = !!event?.checked;
+    const productId = Number(product.productId);
+
+    if (this.sod_eod_component) {
+      if (isChecked) {
+        // FIX #10: don't push the same product twice
+        if (!this.checkBoxSelectedProducts.some(p => Number(p.productId) === productId)) {
+          const avail = this.createAvailableItemsById(productId);
+          const row: MatTableSOD_EOD = {
+            productId,
+            itemsTaken: 0,
+            itemsRemaining: 0,
+            date: this.ClickedCalenderDate, // was avail.lastUpdated (the stock date, not the SOD date)
+            productName: `${product.productName} ${product.productFlavor}`,
+            sellingPrice: product.sellingPrice,
+            availableItems: avail.itemsRemaining,
+            outOfStock: !(avail.itemsRemaining > 0)
+          };
+          this.checkBoxSelectedProducts.push(row);
         }
+        this.dataSourceSodEod.data = this.checkBoxSelectedProducts;
+        this.dataSourceSodEod._updateChangeSubscription();
+      } else {
+        this.removeSodEodByProductId(productId);
       }
-
-    }else{
-      console.log(`Time to make https calls to assign productlist`)
+    } else if (this.newStock_component) {
+      // FIX #11: the old code cleared checkedItems on every click and never added anything
+      // (the stockView call that used to do it was commented out), so New Stock could never be saved.
+      const i = this.checkedItems.findIndex(c => Number(c.productId) === productId);
+      if (isChecked) {
+        if (i === -1) {
+          this.checkedItems.push(
+            this.createNewStockMatTable(this.getProductListByProductId(productId), this.getYummyListById(product))
+          );
+        }
+      } else if (i !== -1) {
+        this.checkedItems.splice(i, 1);
+      }
+      this.checkBoxSelectedProducts_AddNew.data = [...this.checkedItems];
     }
-
-
-
-    return temp;
-  }
-  deleteData(productId: number): Observable<any> {
-
-    this.fullApiUrl = this.apiUrl + "deleteProductbyId"; 
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": deleteProductbyId " + productId + " on " + this.fullApiUrl);
-
-    // Send id in the body as per requirement
-   // return this.http.request<any>('deleteProductbyId', this.fullApiUrl, { body: { productId } });
-
-    return this.http.delete<any>(this.fullApiUrl,  { body: { productId }} )
   }
 
-  deleteProductSS(id:number){
+  // FIX #12: splice(-1, 1) used to delete the LAST row whenever the id wasn't found
+  removeSodEodByProductId(productId: number): void {
+    const remove = (arr: MatTableSOD_EOD[]) => {
+      const i = arr.findIndex(r => Number(r.productId) === Number(productId));
+      if (i !== -1) arr.splice(i, 1);
+    };
+    remove(this.dataSourceSodEod.data);
+    if (this.checkBoxSelectedProducts !== this.dataSourceSodEod.data) remove(this.checkBoxSelectedProducts);
+    this.dataSourceSodEod._updateChangeSubscription();
+  }
 
-  let allGood = true;
-    if (!id) {
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Fiailed id: " + id)
-  throw new Error('Invalid id provided to deleProduct');
-}
-
-
-const removeAvailable$ = this.removeAvailableItemsById(id);
-
-  const removeProductList$ = this.removeProductList(id);
-  const removeEstimate$ = this.removeEstimateById(id);
-  const removeSodEod$ = this.removeSodEodById(id);
-  const removePriceTracing$ = this.removePriceTracing(id);
-  const removeItemPricing$ = this.removeProductItemPricing(id);
-
-  const removeStockedItems$ = this.removeStockedItems(id);
-
-
-
-  forkJoin([
-    removeAvailable$,
-    removeProductList$,
-    removeEstimate$,
-    removeSodEod$,
-    removePriceTracing$,
-    removeItemPricing$,
-    removeStockedItems$
-  ]).subscribe({
-    next: ([res1, res2, res3, res4, res5, res6, res7]) => {
-      console.log(`✅ removeAvailableItemsById:`, res1);
-      console.log(`✅ removeProductList:`, res2);
-      console.log(`✅ removeEstimateById:`, res3);
-      console.log(`✅ removeSodEodById:`, res4);
-      console.log(`✅ removePriceTracing:`, res5);
-      console.log(`✅ removeProductItemPricing:`, res6);
-      console.log(`✅ removeStockedItems:`, res7);
-
-      this.showSuccess(`✔️ All delete operations completed successfully for id [${id}]`);
-    },
-    error: (error) => {
-      console.error(`❌ Error during delete operations for id [${id}]:`, error);
-      this.showError(`Delete operations failed for id [${id}]`);
+  deleteMat_TableSodEodId(productId: number, MatTableObj: any): void {
+    const i = MatTableObj.data.findIndex((r: { productId: number }) => Number(r.productId) === Number(productId));
+    if (i !== -1) {
+      MatTableObj.data.splice(i, 1);
+      MatTableObj._updateChangeSubscription();
     }
-  });
-
-  this.showSuccess(`🚀 All remove operations initiated for id [${id}]`);
-}
-deleteAllProductData(productId:number):Tracer {
-
-  let http_response : Tracer ={
-    status: false,
-    message: ''
   }
-  this.httpClientService.delete<ApiResponse<any>>('deleteAllProductData',productId,'deleteAllProductData').subscribe(
-    {
-      next:response =>{
 
-        console.log(`${JSON.stringify(response)}`)
-        http_response.status = response.success;
-        http_response.message = response.message;
+  // FIX #13: the old version spliced twice (the second splice hid inside a console.log) and removed 2 rows
+  spliceMatTableOfSOD_EOD(indexFound: number): void {
+    if (indexFound >= 0 && indexFound < this.checkBoxSelectedProducts.length) {
+      this.checkBoxSelectedProducts.splice(indexFound, 1);
+    }
+  }
 
+  // FIX #14: replaced array reference used to leave the table pointing at the old array
+  updateMatTableDate(newDate: Date): void {
+    this.ClickedCalenderDate = newDate;
+    const normalized = this.dateTimeService.normalizeDate(this.ClickedCalenderDate);
+
+    if (this.checkBoxSelectedProducts.length > 0) {
+      const updated: MatTableSOD_EOD[] = this.checkBoxSelectedProducts.map(r => ({
+        productId: r.productId,
+        productName: r.productName,
+        itemsRemaining: r.itemsRemaining,
+        itemsTaken: r.itemsTaken,
+        date: normalized,
+        availableItems: r.availableItems,
+        outOfStock: r.outOfStock,
+        sellingPrice: this.getSellingPrice(r.productId)
+      }));
+      this.checkBoxSelectedProducts = updated;
+      this.dataSourceSodEod.data = updated;
+      this.dataSourceSodEod._updateChangeSubscription();
+    }
+  }
+
+  populateToMatTable(): void {
+    this.checkBoxSelectedProducts_AddNew.data = this.checkedItems;
+  }
+
+  // FIX #15: productId came from `product.product` (undefined) and price from getSellingPrice(0)
+  createSodEodTableCheck(product: any): MatTableSOD_EOD {
+    const productId = Number(product.productId);
+    return {
+      productId,
+      itemsTaken: 0,
+      itemsRemaining: 0,
+      date: product.date,
+      productName: product.productName,
+      availableItems: product.availableItems,
+      outOfStock: !!product.outOfStock,
+      sellingPrice: this.getSellingPrice(productId)
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  YUMMY LIST / CREATE HELPERS
+  // ═══════════════════════════════════════════════════════════════════
+
+  createAvailableItem(productYummy: YummyList): AvailableItems {
+    return {
+      productId: productYummy.productId,
+      itemsRemaining: productYummy.productQuantity,
+      lastUpdated: this.dateTimeService.normalizeDate(new Date().toString())
+    };
+  }
+
+  // FIX #16: Map lookup (was O(n*m) with heavy logging) and one entry per product even if pricing has duplicate rows
+  createYummyListArray(_productList: ProductList[], _productPricing: ProductPricing[]): YummyList[] {
+    const byId = new Map<number, ProductList>();
+    for (const p of _productList ?? []) byId.set(Number(p.productId), p);
+
+    const seen = new Set<number>();
+    const out: YummyList[] = [];
+    for (const pr of _productPricing ?? []) {
+      const id = Number(pr.productId);
+      const p = byId.get(id);
+      if (!p || seen.has(id)) continue;
+      seen.add(id);
+      out.push(this.createYummyList(p, pr));
+    }
+    return out;
+  }
+
+  createYummyList(productList: ProductList, productPricing: ProductPricing): YummyList {
+    return {
+      productId: productList.productId,
+      productName: productList.productName,
+      productFlavor: productList.productFlavor,
+      productPrice: productList.productPrice,
+      productSize: productPricing.productSize,
+      productQuantity: productPricing.productQuantity,
+      costPerItem: productPricing.costPerItem,
+      productProfit: productPricing.productProfit,
+      sellingPrice: productPricing.sellingPrice,
+      productCommission: productPricing.productCommission,
+      itemGrouping: productPricing.itemGrouping || 1
+    };
+  }
+
+  createPriceTracing(productYummy: YummyList): PriceTracing {
+    return {
+      productId: productYummy.productId,
+      lastUpdated: this.dateTimeService.normalizeDate(new Date().toString()),
+      accAmount: 0
+    };
+  }
+
+  getYummyListById(product: YummyList): YummyList {
+    return { ...product, itemGrouping: product.itemGrouping || 1 };
+  }
+
+  /** Kicks off a refresh and returns the current list (updated in place when the response arrives). */
+  getYummyList(): YummyList[] {
+    forkJoin({ products: this.getProductList(), pricing: this.getProductPricing() }).subscribe({
+      next: ({ products, pricing }) => {
+        const p = this.coerce<ProductList>(this.unwrap(products), ['productId', 'productPrice']);
+        const pr = this.coerce<ProductPricing>(this.unwrap(pricing),
+          ['productId', 'productQuantity', 'costPerItem', 'productProfit', 'sellingPrice', 'productCommission', 'itemGrouping']);
+        this.setYummyList(this.createYummyListArray(p, pr));
       },
-      error(err) {
-
-        console.error(err.message)
-        http_response.message = err.message;
-      },
-      complete() {
-        console.log("Done runng update call")
-      },
-    }
-  )
-
-return http_response;
-}
-
-deleProduct(id: number) {
-  if (!id) {
-    console.log(this.dateTimeService.formatPartial(Date.now()) + ": Failed id: " + id);
-    throw new Error('Invalid id provided to deleteProduct');
-  }
-/*
-  const removeAvailable$ = this.removeAvailableItemsById(id);
-  const removeProductList$ = this.removeProductList(id);
-  const removeEstimate$ = this.removeEstimateById(id);
-  const removeSodEod$ = this.removeSodEodById(id);
-  const removePriceTracing$ = this.removePriceTracing(id);
-  const removeItemPricing$ = this.removeProductItemPricing(id);
-  const removeStockedItems$ = this.removeStockedItems(id);
-*/
-
-    this.showLoading(`🟡 Deletion initiated for id [${id}]...`);
-    let status :Tracer = this.deleteAllProductData(id);
-
-    if(status.status){
-      this.showSuccess(status.message)
-    }else{
-      this.showError(status.message)
-    }
-
-/*
-  forkJoin([
-    removeAvailable$,
-    removeProductList$,
-    removeEstimate$,
-    removeSodEod$,
-    removePriceTracing$,
-    removeItemPricing$,
-    removeStockedItems$
-  ]).subscribe({
-    next: ([res1, res2, res3, res4, res5, res6, res7]) => {
-      console.log(`✅ removeAvailableItemsById:`, res1);
-      console.log(`✅ removeProductList:`, res2);
-      console.log(`✅ removeEstimateById:`, res3);
-      console.log(`✅ removeSodEodById:`, res4);
-      console.log(`✅ removePriceTracing:`, res5);
-      console.log(`✅ removeProductItemPricing:`, res6);
-      console.log(`✅ removeStockedItems:`, res7);
-
-      this.showSuccess(`✔️ All delete operations completed successfully for id [${id}]`);
-    },
-    error: (error) => {
-      console.error(`❌ Error during delete operations for id [${id}]:`, error);
-      this.showError(`Delete operations failed for id [${id}]: ${error.message || error}`);
-    }
-  });
-  */
-}
-
-  removeStockItemsS(id: number) {
-    this.fullApiUrl = this.apiUrl+ "removeStockedItems" + "/" +id;
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-    return this.http.delete<any>(this.fullApiUrl);  }
-  removeStockedItems(id: number):Observable <any> {
-
-if (!id) {
-  throw new Error('Invalid id provided to removeStockedItems');
-}
-    this.fullApiUrl = "removeStockedItems";
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-//    return this.http.delete<any>(this.fullApiUrl);
-
-    return this.httpClientService.delete<StockedItems>(this.fullApiUrl, id,  "removeStockedItems")
-    
-  }
-  removeProductItemPricing(id: number):Observable <any> {
-
-    if (!id) {
-      throw new Error('Invalid id provided to removeProductItemPricing');
-    }
-
-
-    this.fullApiUrl = "removeProductItemPricing";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-//    return this.http.delete<any>(this.fullApiUrl);
-  return  this.httpClientService.delete<ProductItemPricing>(this.fullApiUrl, id, "removeProductItemPricing");
-  
-
-  }
-  removePriceTracing(id: number):Observable <any> {
-
-if (!id) {
-  throw new Error('Invalid id provided to removePriceTracing');
-}
-      this.fullApiUrl = this.apiUrl+ "removePriceTracing" + "/" +id;
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-      return this.http.delete<any>(this.fullApiUrl);
-  
-  }
-  removeProductList(id:number):Observable <any>{
-
-    this.fullApiUrl = "deleteProduct";
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-    //return this.http.delete<any>(this.fullApiUrl);
-    
-    return this.httpClientService.delete<ProductList>( this.fullApiUrl , id, "deleteProduct")
-
+      error: err => this.showError(err)
+    });
+    return this.yummyList;
   }
 
-  removeEstimateById(id:number):Observable <any>{
+  // ═══════════════════════════════════════════════════════════════════
+  //  ITEM PRICING
+  // ═══════════════════════════════════════════════════════════════════
 
-    this.fullApiUrl = "removeEstimateById" ;
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-         return this.httpClientService.delete<EstimatedPricing>(this.fullApiUrl,id, 'removeEstimateById')
-    //return this.http.delete<any>(this.fullApiUrl);
-
+  addProductItemPricing(_productItemPricingList: ProductItemPricing): void {
+    this.addProductItemPricing_HTTP(_productItemPricingList).subscribe({
+      next: () => this.showSuccess('Successfully added ProductItemPricing'),
+      error: err => this.showError(err)
+    });
   }
 
-  removeAvailableItemsById(id:number):Observable <any>{
-
-    this.fullApiUrl = "removeAvailableItemsById";
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-//    return this.http.delete<any>(this.fullApiUrl);
-
-     return this.httpClientService.delete<AvailableItems>( this.fullApiUrl, id,'removeAvailableItemsById')
-  }
-  
-  removeSodEodById(id:number):Observable <any>{
-if (!id) {
-  throw new Error('Invalid id provided to removeSodEodById');
-}
-    this.fullApiUrl =  "removeSodEodById";
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": removing " + id + " on " + this.fullApiUrl)
-
-   // return this.http.delete<any>(this.fullApiUrl);
-
-   return this.httpClientService.delete<SOD_EOD>(this.fullApiUrl,id,  "removeSodEodById")
-  }
-  
-
-
-  sendToDatabase(): void {
-    // Display Items to be sent to the db
-console.table("Now reading Data to sent to Database")
-
-
+  getProductItemPricing(): void {
+    this.getProductItemPricing_HTTP().subscribe({
+      next: res => { this.productItemPricingList = this.unwrap<ProductItemPricing>(res); },
+      error: err => this.showError('Error in getProductItemPricing: ' + this.msg(err))
+    });
   }
 
-  updatePriceTracing(_priceTracing:PriceTracing) : Observable<void[]>{
-
-
-
-    this.fullApiUrl = this.apiUrl+ "updatePriceTracing";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": updatePriceTracing API Add  Path for updatePriceTracing(): -> "+ this.fullApiUrl +  this.apiUrl);
-  
-  
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Values to add to db for updatePriceTracing", _priceTracing);
-  
-    return  this.http.put<void[]> (this.fullApiUrl, _priceTracing);
-    
-  }
-
-   convertToNumber(value: any): number {
-    if (typeof value === 'string') {
-      // Handling string to number conversion
-      return Number(value);  // Or use +value or parseFloat()
-    } else if (typeof value === 'boolean') {
-      // Handling boolean to number conversion (true -> 1, false -> 0)
-      return value ? 1 : 0;
-    } else if (typeof value === 'number') {
-      // It's already a number
-      return value;
-    } else {
-      // Default case for unsupported types
-      return NaN;
+  // FIX #17: passed the *whole list* to calculateProductItemPricing on every iteration
+  createProductItemPricing(yummyList: YummyList[]): void {
+    for (const yummy of yummyList ?? []) {
+      this.addProductItemPricing(this.calculateProductItemPricing(yummy));
     }
   }
 
-  createProductPricingList_SodEod(sod_eod:MatTableSOD_EOD):ProductPricing{
-    
-    let pPricing:ProductPricing ={
+  calculateProductItemPricing(yummy: YummyList): ProductItemPricing {
+    if (!(yummy.itemGrouping > 0)) {
+      this.showError('itemGrouping is 0 – defaulted to 1');
+    }
+    const grouping = yummy.itemGrouping > 0 ? yummy.itemGrouping : 1;
+
+    const groupQuantity = Math.trunc(yummy.productQuantity / grouping);
+    const remainder = yummy.productQuantity % grouping;
+    // FIX #18: was computed BEFORE `remainder` existed, so it was always 0
+    const costOfRemainder = remainder * yummy.costPerItem;
+
+    let groupProfitPerItem = 0;
+    let groupCommissionPerItem = 0;
+    if (groupQuantity !== 0) {
+      groupProfitPerItem = yummy.productProfit / groupQuantity;
+      // FIX #18b (please confirm): was productQuantity / groupQuantity, i.e. items-per-group, not a commission
+      groupCommissionPerItem = yummy.productCommission / groupQuantity;
+    }
+
+    return {
+      productDescription: yummy.productId.toString(),
+      itemsRemainder: remainder,
+      costOfRemainder,
+      groupedQuantity: groupQuantity,
+      groupedProfit: groupProfitPerItem,
+      groupedCommission: groupCommissionPerItem,
+      itemGroup: grouping,
+      productId: yummy.productId
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  LOOK-UPS (all synchronous, backed by the loaded state)
+  // ═══════════════════════════════════════════════════════════════════
+
+  getProductCostPerItem(productId: number): number {
+    const p = this.yummyList.find(y => Number(y.productId) === Number(productId));
+    return p ? p.costPerItem : -1;
+  }
+
+  // FIX #19: used to return the LAST row's itemsRemaining no matter which productId was asked for
+  getProductItemsRemaining(_productId: number): number {
+    const a = this.availableItems.find(x => Number(x.productId) === Number(_productId));
+    return a ? a.itemsRemaining : -1;
+  }
+
+  getavailableitems(productId: number): number {
+    return this.getProductItemsRemaining(productId);
+  }
+
+  // FIX #20: was subscribing to an HTTP call and returning 0 before the response arrived
+  getAvaialableItemsById(productId: number): number {
+    return Math.max(this.getProductItemsRemaining(productId), 0);
+  }
+
+  getAvailableItemsById_http(productId: number): Observable<number> {
+    return this.getAvailableItems().pipe(
+      map(res => this.unwrap<AvailableItems>(res).find(i => Number(i.productId) === Number(productId))?.itemsRemaining ?? 0),
+      catchError(() => of(0))
+    );
+  }
+
+  // FIX #20b: same async-return-of-empty-string bug; it was feeding '' into SOD_EOD.productName
+  getProductNameById(productId: number): string {
+    const p = this.productList.find(x => Number(x.productId) === Number(productId));
+    return p ? p.productName : 'Unknown';
+  }
+
+  getProductNameById_http(productId: number): Observable<string> {
+    return this.getProductList().pipe(
+      map(res => this.unwrap<ProductList>(res).find(p => Number(p.productId) === Number(productId))?.productName ?? 'Unknown'),
+      catchError(() => of('Unknown'))
+    );
+  }
+
+  // FIX #21: `if(this.productList)` is always truthy for an array; the "else" HTTP fallback was dead code
+  getProductPriceById(productId: number): number {
+    const p = this.productList.find(x => Number(x.productId) === Number(productId));
+    return p ? p.productPrice : 0;
+  }
+
+  getProductListByProductId(_productId: number): ProductList {
+    const found = this.productList.find(p => Number(p.productId) === Number(_productId));
+    return found ?? { productId: 0, productName: '', productFlavor: '', productPrice: 0, image_url: '' };
+  }
+
+  createAvailableItemsById(_productId: number): AvailableItems {
+    const found = this.availableItems.find(a => Number(a.productId) === Number(_productId));
+    return found ?? {
+      productId: 0,
+      itemsRemaining: 0,
+      lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
+    };
+  }
+
+  getSellingPrice(productId: number): number {
+    return this.getPricing(productId)?.sellingPrice ?? 0;
+  }
+
+  getPrevAccumulatedAmountByProductId(productId: number): number {
+    const t = this.priceTracingList.find(x => Number(x.productId) === Number(productId));
+    return t ? t.accAmount : -1;
+  }
+
+  getProdcutCostPriceByProductId(productId: number): number {
+    const p = this.getPricing(productId);
+    return p ? p.costPerItem : -1;
+  }
+
+  getProdcutSellingPriceByProductId(productId: number): number {
+    const p = this.getPricing(productId);
+    return p ? p.sellingPrice : -1;
+  }
+
+  getProductFullNameByProductId(productId: number): string {
+    const p = this.productList.find(x => Number(x.productId) === Number(productId));
+    return p ? `${p.productName} ${p.productFlavor}` : 'WRONG NAME';
+  }
+
+  getLastUpdateOnAvailableItems(productId: number): any {
+    const a = this.availableItems.find(x => Number(x.productId) === Number(productId));
+    return a ? a.lastUpdated : this.dateTimeService.formatDate(Date.now(), 'mysql');
+  }
+
+  checkForAvailableItems(productId: number): boolean {
+    return this.availableItems.some(a => Number(a.productId) === Number(productId));
+  }
+
+  findAnyByProductId(searchedArray: any, productIdToFind: number): boolean {
+    return Number(searchedArray?.productId) === Number(productIdToFind);
+  }
+
+  findProductByProductId(products: ProductList[], productIdToFind: number): ProductList | null {
+    return products.find(p => Number(p.productId) === Number(productIdToFind)) ?? null;
+  }
+
+  searchProductId_inSodEodItems(productIdToMatch: number): boolean {
+    return this.sod_eod_list.some(s => Number(s.productId) === Number(productIdToMatch));
+  }
+
+  searchProductId_inEstimates(productIdToMatch: number): boolean {
+    return this.priceEstimates.some(e => Number(e.productId) === Number(productIdToMatch));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  ESTIMATES / CALCULATIONS
+  // ═══════════════════════════════════════════════════════════════════
+
+  calculateDailyEstimates(_itemsTaken: number, _itemsReturned: number, sellingPrice: number): number {
+    // Old version had three overlapping branches (incl. `_itemsReturned > 0 && _itemsReturned > 0`) that all
+    // reduce to this one formula.
+    return (_itemsTaken - _itemsReturned) * sellingPrice;
+  }
+
+  calculateDailyEstimatesReturn(_itemsRemaining: number, sellingPrice: number): number {
+    return _itemsRemaining * sellingPrice;
+  }
+
+  onDateSelected(selectedDate: Date): void {
+    this.selectedDate = selectedDate;
+  }
+
+  // FIX #22: `if(sod_eod.productId == _availableItemsProductId)` compared the row to itself (always true),
+  // so the price used was simply the LAST pricing row in the array.
+  createEstimatedPricing_sod_eod(sod_eod: MatTableSOD_EOD, productPricing: ProductPricing[]): EstimatedPricing {
+    const pricing = (productPricing ?? []).find(p => Number(p.productId) === Number(sod_eod.productId));
+    const sellingPrice = pricing ? pricing.sellingPrice : -1;
+    return {
+      productId: sod_eod.productId,
+      estimatedSelling: sellingPrice * sod_eod.itemsTaken,
+      actualSelling: sellingPrice * (sod_eod.itemsTaken - sod_eod.itemsRemaining),
+      lastUpdated: sod_eod.date
+    };
+  }
+
+  createProductPricingList_SodEod(sod_eod: MatTableSOD_EOD): ProductPricing {
+    return this.getPricing(sod_eod.productId) ?? {
       productId: sod_eod.productId,
       productSize: 0,
       productQuantity: 0,
@@ -2920,1441 +965,793 @@ console.table("Now reading Data to sent to Database")
       sellingPrice: 0,
       productCommission: 0,
       itemGrouping: 0
+    };
+  }
+
+  createAvailableItems_SodEod(sod_eod: MatTableSOD_EOD, availableItems: AvailableItems): AvailableItems {
+    return {
+      productId: sod_eod.productId,
+      itemsRemaining: availableItems.itemsRemaining - (sod_eod.itemsTaken - sod_eod.itemsRemaining),
+      lastUpdated: sod_eod.date
+    };
+  }
+
+  createSodEod(sod_eod: MatTableSOD_EOD): SOD_EOD {
+    return {
+      productId: sod_eod.productId,
+      itemsTaken: sod_eod.itemsTaken,
+      itemsRemaining: sod_eod.itemsRemaining,
+      lastUpdated: sod_eod.date,
+      productName: sod_eod.productName
+    };
+  }
+
+  updatedAvaialbleItems_SodEod(sod_eod: MatTableSOD_EOD): AvailableItems {
+    const found = this.availableItems.find(a => Number(a.productId) === Number(sod_eod.productId));
+    if (!found) {
+      return {
+        productId: -sod_eod.productId,
+        itemsRemaining: 0,
+        lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
+      };
+    }
+    return {
+      productId: sod_eod.productId,
+      itemsRemaining: found.itemsRemaining - (sod_eod.itemsTaken - sod_eod.itemsRemaining),
+      lastUpdated: sod_eod.date
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  SOD / EOD SAVE  (FIX #23 – the big duplicate-write bug)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Entry point used by the "Save" buttons. */
+  showOnMatTable(operation: string): void {
+    if (operation === 'SodEod') {
+      // FIX #23: the two branches were identical apart from the source; use the table the user actually sees.
+      const tableData = this.dataSourceSodEod.data.slice();
+      if (!tableData.length) { this.showError('Nothing selected'); return; }
+      const ids = new Set(tableData.map(t => Number(t.productId)));
+      const avail = this.availableItems.filter(a => ids.has(Number(a.productId)));
+      this.debitCreditAvailableItems(avail, tableData, 'SodEod');
+    } else if (operation === 'AddNew') {
+      // The old code compared `Date === Date` (always false) against SOD dates, which is unrelated to adding stock.
+      const tableData = this.checkBoxSelectedProducts_AddNew.data.slice();
+      if (!tableData.length) { this.showError('Nothing selected'); return; }
+      this.debitCreditAvailableItems(this.availableItems, tableData, 'AddNew');
+    } else {
+      this.showError('Invalid Operation');
+    }
+  }
+
+  sendDataSourceSodEod(): void {
+    const rows = this.dataSourceSodEod.data.slice();
+    this.getAvailableItems().subscribe({
+      next: res => {
+        const avail = this.coerce<AvailableItems>(this.unwrap(res), ['productId', 'itemsRemaining']);
+        this.debitCreditAvailableItems(avail, rows, 'SodEod');
+      },
+      error: err => this.showError(err)
+    });
+  }
+
+  /**
+   * Validates every row, builds ONE payload per product and posts it to `addListOfSodEod`.
+   *
+   * What was wrong before:
+   *  - each row was written TWICE: once through `addListOfSodEod` and again through a nested
+   *    addSodEod -> addAvailableItems -> addEstimatedPricing chain (whose URL was built from the shared
+   *    `fullApiUrl`, i.e. random). That duplicated SOD_EOD rows and double-deducted stock.
+   *  - no validation: remaining > taken, negative stock, same product twice, same day captured twice.
+   *  - loading snackbar never dismissed; success was reported on the first response, not on completion.
+   *  - the parameter was named `Object`, shadowing the global.
+   *  - `costOfRemainder` was `remaining + cost` (adding a quantity to a price); now `remaining * cost`.
+   *  - estimates were stored as quantities in one place and money in another; now always money.
+   *  - lastUpdated was `now()`, ignoring the date the user picked on the calendar.
+   *
+   * Returns true if at least one request was dispatched (the save itself is asynchronous).
+   */
+  debitCreditAvailableItems(_availableItems: AvailableItems[], payload: any, operation: string): boolean {
+    const fn = 'debitCreditAvailableItems';
+
+    if (operation === 'AddNew') {
+      // FIX #24: this branch used to be a console.log. Wire it to the stock flow.
+      this.finalizeNewStock(Array.isArray(payload) ? payload : []);
+      return true;
+    }
+    if (operation !== 'SodEod') {
+      this.showError(`${fn}: invalid operation "${operation}"`);
+      return false;
     }
 
-    if(this.productItemPricingList){
+    const rows: MatTableSOD_EOD[] = Array.isArray(payload) ? payload : [];
+    const availSource = _availableItems?.length ? _availableItems : this.availableItems;
+    const availById = new Map<number, AvailableItems>();
+    for (const a of availSource) availById.set(Number(a.productId), a);
 
+    const problems: string[] = [];
+    const requests: Observable<{ productId: number; ok: boolean }>[] = [];
+    const seen = new Set<number>();
 
+    for (const row of rows) {
+      const productId = Number(row.productId);
+      const label = row.productName || `#${productId}`;
 
-      for(let productItemPricing of this.productPricingList){
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": productItemPricing ID[" + productItemPricing +"] ", productItemPricing);
-        
-          if(sod_eod.productId === productItemPricing.productId){
+      if (seen.has(productId)) { problems.push(`${label}: listed twice`); continue; }
+      seen.add(productId);
 
-            pPricing = productItemPricing;
+      const avail = availById.get(productId);
+      if (!avail) { problems.push(`${label}: no AvailableItems record (add stock first)`); continue; }
 
-          }
-      
-        }
-      
-    }else{
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Empty this.productItemPricingList");
-    }
+      const taken = this.convertToNumber(row.itemsTaken);
+      const remaining = this.convertToNumber(row.itemsRemaining);
+      if (Number.isNaN(taken) || Number.isNaN(remaining) || taken < 0 || remaining < 0) {
+        problems.push(`${label}: items taken/remaining must be numbers >= 0`); continue;
+      }
+      if (remaining > taken) { problems.push(`${label}: items remaining (${remaining}) can't exceed items taken (${taken})`); continue; }
 
-    return pPricing;
-  }
-createEstimatedPricing_sod_eod(sod_eod :MatTableSOD_EOD, productPricing:ProductPricing[]):EstimatedPricing
-{
+      const sold = taken - remaining;
+      const availableAfter = Number(avail.itemsRemaining) - sold;
+      if (availableAfter < 0) { problems.push(`${label}: only ${avail.itemsRemaining} in stock, tried to sell ${sold}`); continue; }
 
-  let _availableItemsProductId = Number(sod_eod.productId);
-  let _itemsTaken = sod_eod.itemsTaken;
-  let _itemsRemaining = sod_eod.itemsRemaining;
-  let sellingPrice = -1;
-  let _sodEodDate = sod_eod.date;
-
-
-
-  for(let product of productPricing){
-
-    if(sod_eod.productId == _availableItemsProductId){
-
-      sellingPrice = product.sellingPrice
-    }
-  }
-
-  let updatedPriceEstimates: EstimatedPricing ={
-    productId:sod_eod.productId, 
-    estimatedSelling: sellingPrice * _itemsTaken,
-    actualSelling: sellingPrice * ( _itemsTaken - _itemsRemaining),
-    lastUpdated: _sodEodDate
-  }
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": updatedPriceEstimates ready to be shipped : ", updatedPriceEstimates);
-  return updatedPriceEstimates;
-}
-
-getSellingPrice(productId:number):number{
-let sellingPrice:number=0;
-
-  for(let productPricingList of this.productPricingList ){
-
-    if(productPricingList.productId === productId){
-      
-      sellingPrice = productPricingList.sellingPrice;
-
-    }
-
-  }
-
-
-
-  return sellingPrice;
-}
-
-
-getPrevAccumulatedAmountByProductId(productId:number):number{
-
-  let accAmount = -1;
-
-  if(this.priceTracingList.length > 0){
-
-    for(let pricetracing of this.priceTracingList){
-
-          if(productId === pricetracing.productId){
-
-            accAmount  = pricetracing.accAmount
-
-          }
-
-    }
-
-
-  }
-
-  return accAmount;
-}
-
-updatedAvaialbleItems_SodEod(sod_eod:MatTableSOD_EOD):AvailableItems{
-
-  let updatedAvailableItems:AvailableItems={
-    productId: -(sod_eod.productId),
-    itemsRemaining: 0,
-    lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
-  }
-
-  for (let availableItems of this.availableItems){
-
-    if(sod_eod.productId === availableItems.productId){
-
-      updatedAvailableItems ={
-        productId: sod_eod.productId,
-        itemsRemaining: availableItems.itemsRemaining - (sod_eod.itemsTaken - sod_eod.itemsRemaining),
-        lastUpdated: sod_eod.date
+      const date = this.dateTimeService.normalizeDate((row.date ?? this.ClickedCalenderDate) as any);
+      if (this.sod_eod_list.some(s => Number(s.productId) === productId && this.sameDay(s.lastUpdated, date))) {
+        problems.push(`${label}: SOD/EOD already captured for that date`); continue;
       }
 
-    }
-  }
+      const sellingPrice = this.getSellingPrice(productId);
+      const cost = Math.max(this.getProdcutCostPriceByProductId(productId), 0);
+      const profit = sold * (sellingPrice - cost);
 
+      const estimates: EstimatedPricing = {
+        productId,
+        estimatedSelling: sellingPrice * taken,
+        actualSelling: sellingPrice * sold,
+        lastUpdated: date
+      };
 
-  return updatedAvailableItems;
-}
+      // getPrevAccumulatedAmountByProductId returns -1 for "not found" – that must not be added to the total
+      const prevAcc = Math.max(this.getPrevAccumulatedAmountByProductId(productId), 0);
 
-
-getProdcutCostPriceByProductId(productId:number):number{
-  let cost = -1;
-
-let productPricing:ProductPricing[] = this.sourceOfTruth.productPricing.getValue();
-  for(let pPricing of productPricing){
-
-    if(productId===pPricing.productId){
-      return  pPricing.costPerItem
-    } 
-  }
-  
-
-  return cost;
-}
-getProdcutSellingPriceByProductId(productId:number):number{
-  let cost = -1;
-
-let productPricing:ProductPricing[] = this.sourceOfTruth.productPricing.getValue();
-  for(let pPricing of productPricing){
-
-    if(productId===pPricing.productId){
-      return  pPricing.sellingPrice
-    } 
-  }
-  
-
-  return cost;
-}
-
-getProductFullNameByProductId(productId:number): string{
-  let name ='WRONG NAME';
-
-   let product:ProductList[] = this.sourceOfTruth.productList.getValue()
-
-   for(let pList of product){
-
-    if(productId === pList.productId){
-
-      return pList.productName + pList.productFlavor;
-
-    }
-   }
-
-  return name;
-
-}
-
-debitCreditAvailableItems(_availableItems: AvailableItems[], Object:any, operation:string):boolean{
-    const functionName = `${this.dateTimeService.normalizeDate(Date.now())} debitCreditAvailableItems: `
-
-  this.showLoading("Busy Cooking")
-    //console.log(`${functionName} sourceOfTruth \n ${JSON.stringify(sourceOfTruth)}`)
-    let availableItemsSodEodToUpdate : AvailableItems[]=[]
-    let estimatedSodEodToUpdate: EstimatedPricing[]=[];
-    let sodEodToUpdate : SOD_EOD[]=[];
-    let productPricingListSodEodToUpdate:ProductPricing[]=[];
-    
-     console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Passed Values Object:", Object)
-     console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": operationPassed Values :", operation)
-     console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Passed Values _availableItems:", _availableItems)
-
-if(operation === "SodEod"){
-  let tempSodEodTable:MatTableSOD_EOD[]= Object;
-
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Now adding SodEod Record from Table tempSodEodTable ", tempSodEodTable);
-     console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Now adding SodEod to _availableItems", _availableItems);
-
-  //console.log(Object);
-  this.newAvailableItems.splice(0); // Clear 
-
-  
-
- 
-     // this.availableItems = ResponseUtils.extractFirstArrayFromNested(response);
-      console.log(functionName+ ` Done calling Available items`, this.availableItems)
-console.log(functionName + "passed _availableItems :", _availableItems)
-
-        for (let availableItems of _availableItems){
-//console.log(functionName + "passed availableItems :", availableItems)
-
-    let productId = availableItems.productId;
-
-    for(let sod_eod of tempSodEodTable){
-//console.log(functionName + "sodEod :", sod_eod)
-
-      const date :Date = this.dateTimeService.normalizeDate(Date.now());
-      const itemsTaken = this.convertToNumber(sod_eod.itemsTaken);
-      const itemsRemaining = this.convertToNumber(sod_eod.itemsRemaining);
-      const itemsToDeduct = itemsTaken - itemsRemaining;
-      const Available_Remaining = availableItems.itemsRemaining - itemsToDeduct;
-      //const deductedItem :number = Available_Remaining - itemsToDeduct;
-
-      
-      
-      if(productId == sod_eod.productId){
-
-         //console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": sod_eod Prduct ID[" + productId+ "]", sod_eod)
-
-        let newSOD_EOD_Temp :SOD_EOD ={
-          productId: sod_eod.productId,
-          itemsTaken: itemsTaken,
-          itemsRemaining: itemsRemaining,
+      const body = {
+        sodEOd: <SOD_EOD>{
+          productId,
+          itemsTaken: taken,
+          itemsRemaining: remaining,
           lastUpdated: date,
-          productName: this.getProductNameById(productId)
-        }
-        let newAvailableItems_After_Deductions:AvailableItems ={
-          productId: sod_eod.productId,
-          itemsRemaining: Available_Remaining,
-          lastUpdated: date
-        }
-
-        let newEstimates:EstimatedPricing ={
-          productId: sod_eod.productId,
-          estimatedSelling: sod_eod.itemsTaken,
-          actualSelling: (sod_eod.itemsTaken - sod_eod.itemsRemaining),
-          lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
-        }
-
-
-        let pricingTracing:PriceTracing ={
-          productId: productId,
-          lastUpdated: date,
-          accAmount: this.getPrevAccumulatedAmountByProductId(productId) + (this.getSellingPrice(productId))*(newEstimates.actualSelling)
-        }
-        
-        let newPriceTracing: ProductItemPricing ={
-          productId: productId,
+          productName: row.productName || this.getProductNameById(productId)
+        },
+        availableItems: <AvailableItems>{ productId, itemsRemaining: availableAfter, lastUpdated: date },
+        estimates,
+        pricingTracing: <PriceTracing>{ productId, lastUpdated: date, accAmount: prevAcc + estimates.actualSelling },
+        ProductItemPricing: <ProductItemPricing>{
+          productId,
           productDescription: this.getProductNameById(productId),
           itemGroup: 1,
-          itemsRemainder: newAvailableItems_After_Deductions.itemsRemaining,
-          costOfRemainder: newAvailableItems_After_Deductions.itemsRemaining + this.getProdcutCostPriceByProductId(productId),
+          itemsRemainder: availableAfter,
+          costOfRemainder: availableAfter * cost,
           groupedQuantity: 0,
-          groupedProfit: newEstimates.actualSelling * ( this.getProdcutSellingPriceByProductId(productId) - this.getProdcutCostPriceByProductId(productId) ),
-          groupedCommission: (1 - 0.3 ) * (newEstimates.actualSelling * ( this.getProdcutSellingPriceByProductId(productId) - this.getProdcutCostPriceByProductId(productId) ))
+          groupedProfit: profit,
+          groupedCommission: (1 - this.SHOP_COMMISSION_RATE) * profit
         }
+      };
 
-
-
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit Items Taken for Id[" + productId + "]", itemsTaken);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit Items Remaining for Id[" + productId + "]", itemsRemaining);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit itemsToDeduct for Id[" + productId + "]", itemsToDeduct);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit newAvailableItems for Id[" + productId + "]", this.newAvailableItems);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit sod_eod for Id[" + productId + "]", sod_eod);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit TYPEOF Items Taken for Id[" + productId + "]", typeof itemsTaken);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit TYPEOF Items Remaining for Id[" + productId + "]", typeof itemsRemaining);
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Done Deductions_and_Credit TYPEOF itemsToDeduct for Id[" + productId + "]", typeof itemsToDeduct);
-
-        
-        // Add Important Staff
-        this.newAvailableItems.push(newAvailableItems_After_Deductions);
-        sodEodToUpdate.push(this.createSodEod(sod_eod));
-        availableItemsSodEodToUpdate.push(this.createAvailableItems_SodEod(sod_eod, availableItems));
-        productPricingListSodEodToUpdate.push(this.createProductPricingList_SodEod(sod_eod));
-        estimatedSodEodToUpdate.push(this.createEstimatedPricing_sod_eod(sod_eod, productPricingListSodEodToUpdate));
-        console.log(`Done Calculation all details about product, sodEodToUpdate ${JSON.stringify(sodEodToUpdate)}  \n availableItemsSodEodToUpdate ${JSON.stringify(availableItemsSodEodToUpdate)}
-         \n productPricingListSodEodToUpdate ${JSON.stringify(productPricingListSodEodToUpdate)} \n 
-         estimatedSodEodToUpdate ${JSON.stringify(estimatedSodEodToUpdate)} \n 
-         newAvailableItems ${JSON.stringify(this.newAvailableItems)} \n sod_eod${JSON.stringify(sod_eod)}
-         availableItemsSodEodToUpdate: ${JSON.stringify(availableItemsSodEodToUpdate)}`)
-
-
-         const len_sodEodToUpdate = sodEodToUpdate.length;
-        const len_availableItemsSodEodToUpdate = availableItemsSodEodToUpdate.length;
-        const len_estimatedSodEodToUpdate = estimatedSodEodToUpdate.length;
-        const len_productPricingListSodEodToUpdate = productPricingListSodEodToUpdate.length;
-
-        if(len_availableItemsSodEodToUpdate !== len_estimatedSodEodToUpdate || len_productPricingListSodEodToUpdate !== len_sodEodToUpdate){
-          this.showError(functionName + " Failed to proccees with the operation because data fields from table is not equal")
-          console.error(functionName + " Failed to proccees with the operation because data fields from table is not equal")
-
-        } 
-
-
-        let sod_eodList ={
-          sodEOd:newSOD_EOD_Temp,
-          availableItems: newAvailableItems_After_Deductions,
-          estimates: newEstimates,
-          pricingTracing:pricingTracing,
-          ProductItemPricing:newPriceTracing
-        }
-        this.httpClientService.post<any>("addListOfSodEod",sod_eodList,"addListOfSodEod").subscribe(
-          {
-            next(value) {
-              console.log('Successfully Added the stock to backend '+ JSON.stringify(value))
-              
-            },error(err) {
-              console.error('Successfully Added the stock to backend ' + JSON.stringify(err))
-
-            },
-          }
+      requests.push(
+        this.httpClientService.post<any>('addListOfSodEod', body, 'addListOfSodEod').pipe(
+          map(() => ({ productId, ok: true })),
+          catchError(err => {
+            problems.push(`${label}: ${this.msg(err)}`);
+            return of({ productId, ok: false });
+          })
         )
-
- /*
-         this.httpClientService.post<SOD_EOD>(environment.backend_endpoints.addSodEodItems, newSOD_EOD_Temp, environment.backend_endpoints.addSodEodItems).subscribe(
-          res =>{
-            console.log("Done Updating with response: "+ ResponseUtils.extractFirstArrayFromNested(res))
-
-          }
-         )
-         this.httpClientService.post<AvailableItems>(environment.backend_endpoints.addAvailableItems ,newAvailableItems_After_Deductions,environment.backend_endpoints.addAvailableItems).subscribe(
-          res =>{
-                        console.log("Done Updating with response: "+ ResponseUtils.extractFirstArrayFromNested(res))
-
-          }
-         );
-         this.httpClientService.post<EstimatedPricing>(environment.backend_endpoints.addEstimates ,newEstimates, environment.backend_endpoints.addEstimates).subscribe(
-          res =>{
-                        console.log("Done Updating with response: "+ ResponseUtils.extractFirstArrayFromNested(res))
-
-          }
-         );
-         this.httpClientService.post<ProductItemPricing>(environment.backend_endpoints.addProductItemPricing, newPriceTracing , environment.backend_endpoints.add2Pricing).subscribe(
-          res =>{
-                        console.log("Done Updating with response: "+ ResponseUtils.extractFirstArrayFromNested(res))
-
-          }
-         );
-        
- 
-// Build the requests
-const requests = [
-  this.httpClientService.post<SOD_EOD>(
-    environment.backend_endpoints.addSodEodItems,
-    newSOD_EOD_Temp,
-    environment.backend_endpoints.addSodEodItems
-  ),
-  this.httpClientService.post<AvailableItems>(
-    environment.backend_endpoints.addAvailableItems,
-    newAvailableItems_After_Deductions,
-    environment.backend_endpoints.addAvailableItems
-  ),
-  this.httpClientService.post<EstimatedPricing>(
-    environment.backend_endpoints.addEstimates,
-    newEstimates,
-    environment.backend_endpoints.addEstimates
-  ),
-  this.httpClientService.post<ProductItemPricing>(
-    environment.backend_endpoints.addProductItemPricing,
-    newPriceTracing,
-    environment.backend_endpoints.add2Pricing
-  )
-];
-
-forkJoin(requests)
-  .pipe(
-    catchError(err => {
-      console.error('❌ One of the requests failed:', err);
-
-      this.showError(`❌ One of the requests failed: ${JSON.stringify(err)}`)
- 
-      return throwError(() => err);
-    })
-  )
-  .subscribe({
-    next: (results) => {
-      console.log('✅ All requests succeeded:');
-      results.forEach(res => {
-        console.log(ResponseUtils.extractFirstArrayFromNested(res));
-      });
-
-      this.showSuccess(`✅ Done Adding + ${operation}`)
-    this.dataSourceSodEod.data.splice(0); // Remove
-
- 
-    },
-    error: () => {
-      console.warn('❌ Transaction aborted.');
-      this.showError(`❌ Transaction aborted.${JSON.stringify(operation)}`)
-
-    }
-  });
-
-*/
-      } // end of match if statement
-
-    } //End of for loop
-    
-
-
-  }
-
-    
-  
-  // cREATE dATA sETS
-
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ************************************ \n ", );
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Ready to send to Database:SOD_EOD \n ", sodEodToUpdate);
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Ready to send to Database: availableItems \n ", availableItemsSodEodToUpdate);
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Ready to send to Database: estimatedSodEod \n ",estimatedSodEodToUpdate);
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Ready to send to Database: \n productPricingListSodEodToUpdate", productPricingListSodEodToUpdate);
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ************************************ \n ", );
-// HttpCall for sodEodToUpdate
-
-let sod_eod_length = sodEodToUpdate.length;
-let availableItemsSodEodToUpdate_length = availableItemsSodEodToUpdate.length
-let estimatedSodEodToUpdate_length = estimatedSodEodToUpdate.length;
-
-console.log(`${functionName } DATA TO SENT TO THE DB: about product, \n
-sodEodToUpdate ${sodEodToUpdate}  \n`
- + `sodEodToUpdate ${sodEodToUpdate} \n` 
-+ `availableItemsSodEodToUpdate ${availableItemsSodEodToUpdate} \n`
-+`sod_eod_length ${sod_eod_length} \n`
-+ `estimatedSodEodToUpdate ${estimatedSodEodToUpdate} \n`
-+ `sod_eod_length sod_eod_length} \n`
-)
-
-if(sod_eod_length || availableItemsSodEodToUpdate_length || sod_eod_length ||  estimatedSodEodToUpdate_length){
-
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Lenght is equal, Ready to ship to Db");
-  for(let sodEod of sodEodToUpdate ){
-      // 1, 3, 4
-    for(let aitems of availableItemsSodEodToUpdate){
-      // 1, 3 , 4
-      if(aitems.productId === sodEod.productId){
-
-        for(let esSod of estimatedSodEodToUpdate){
-          // 1, 3, 4
-          if(esSod.productId === aitems.productId){
-
-             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product Id for sodEodToUpdate[" +sodEod.productId+"]");
-             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product Id for availableItemsSodEodToUpdate [" + aitems.productId +"]");
-             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product Id for estimatedSodEodToUpdate [" +esSod.productId+"]");
-console.log(`${functionName } DATA TO SENT TO THE DB: about product, sodEodToUpdate ${JSON.stringify(sodEodToUpdate)}  \n 
-availableItemsSodEodToUpdate ${JSON.stringify(availableItemsSodEodToUpdate)} \n productPricingListSodEodToUpdate ${JSON.stringify(productPricingListSodEodToUpdate)} \n 
-estimatedSodEodToUpdate ${JSON.stringify(estimatedSodEodToUpdate)} \n newAvailableItems ${JSON.stringify(this.newAvailableItems)} \n 
-sod_eod${JSON.stringify(sodEod)} estimatedSodEodToUpdate ${JSON.stringify( aitems)}`)
-
-            this.httpClientService.post<SOD_EOD>(`${this.fullApiUrl}/addSodEod`,sodEod).subscribe(
-              res =>{
-                console.log(`${functionName} SOD_EOD added successfully:`, res);
-                this.showSuccess(`SOD_EOD for ${sodEod.lastUpdated} added successfully`);
-            this.httpClientService.post<AvailableItems>(`${this.fullApiUrl}/addAvailableItems`,aitems).subscribe(
-              res =>{
-                console.log(`${functionName} available items added successfully:`, res);
-
-                this.httpClientService.post<EstimatedPricing>(`${this.fullApiUrl}/addEstimatedPricing`,esSod).subscribe(
-                  res =>{
-                    console.log(`${functionName} estimated pricing added successfullly: `, res);
-                    this.clearMatTable();
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD EOD for "+ sodEod.lastUpdated + " Succeesfully added to Database")
-                     
-
-                  }
-                )
-              }
-            )
-
-
-
-              }
-            )
-/*
-            this.addSodEod(sodEod).subscribe(
-              res=>{
-                // First Success Http
-                  console.log(`Done calling sening SodEod`)
-                this.updateAvailableItems(aitems).subscribe(
-                  res=>{
-                  console.log(`Done calling sending available items`)
-
-                    // Second Success Http
-                    this.addEstimates(esSod).subscribe(
-                      res=>{
-                          // Last Success Http
-                  console.log(`Done calling sending EStimate items`)
-
-                          this.clearMatTable();
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD EOD for "+ sodEod.lastUpdated + " Succeesfully added to Database")
-                      },error=>{
-                        
-
-                      }
-                    );
-                  },error=>{
-    
-                  }
-                );
-              },error=>{
-
-              }
-            );
-*/
-
-            
-          }
-
-
-      }
-    
-      }
-
+      );
     }
 
-  }
-
-
-
-
-}else{
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Failed to load SOD_EOD dba")
-}
-
-
-
-// HttpCall for availableItemsSodEodToUpdate
-
-
-// HttpCall for availableItemsSodEodToUpdate
-
-
-// HttpCall for estimatedSodEodToUpdate
-
-
-// HttpCall for productPricingListSodEodToUpdate
-
-
-
-
-}else if(operation === "AddNew"){
-
-   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Now adding AddNew to debitCreditAvailableItems",Object)
-
-}
-
-/* Steps involve in completing SOD_EOD 
-
-1. Check for SOD_EOD List
-2. Find product Id in available Items
-3. assign itemTaken, itemRemaining, SodEodDate, productName and ItemAvailable  
-4. if PriceTracingList has some value
-    - run through the list
-    - run through Product Pricing
-5. Update Pricing Estimate
-6. Update AvailableItems by deducting
-7. Check Estimate obj length
-
-Http Calls
-updateEstimates
-updateAvailableItems
-updateSodEod
-
-*/
-
-
-
-
-
-
-// Final Step for SOD_EOD 
-
-
-    if(this.sod_eod_list.length> 0 ){
-    /*
-      let availableItemsSodEodToUpdate : AvailableItems[]=[]
-      let estimatedSodEodToUpdate: EstimatedPricing[]=[];
-      let sodEodToUpdate : SOD_EOD[]=[];
-
-
-      for(let _sod_eodList of this.sod_eod_list){
-
-        const _sod_eodProductId = _sod_eodList.productId;
-
-            for(let items of _availableItems){
-            const _availableItemsProductId = items.productId;
-            this.availableItemFound = false;
-
-      if(_sod_eodProductId === _availableItemsProductId){
-         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product ID match - _sod_eodList[" + _sod_eodProductId +"] _availableItemsProductId[" + _availableItemsProductId +"]")
-        
-        this.availableItemFound = true;
-        // Now we found match now let do some magic
-        const _itemsTaken = _sod_eodList.itemsTaken;
-        const _itemsRemaining = _sod_eodList.itemsRemaining;
-        const _sodEodDate = this.dateTimeService.normalizeDate(_sod_eodList.lastUpdated.toString());
-        const _productName = _sod_eodList.productName;
-        const _itemsAvailable = items.itemsRemaining;
-
-        if(this.priceTracingList){
-          //  Pricing Tracing List 
-          for (let _priceTracing of this.priceTracingList){
-            const priceTracingProductId = _priceTracing.productId;
-
-            if( priceTracingProductId === _availableItemsProductId){
-
-             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product ID match - priceTracingProductId [" + priceTracingProductId +"] _availableItemsProductId[" + _availableItemsProductId +"]")
-
-              const accumulatedAmount = _priceTracing.accAmount;
-              const priceTracingLastUpdated = _priceTracing.lastUpdated;
-              // Product Pricing List 
-              for(let _productPricing of this.productPricingList){
-                
-                const productPricingId = _productPricing.productId;
-
-                if(productPricingId === _availableItemsProductId){
-                  const sellingPrice = _productPricing.sellingPrice;
-
-
-                  if(_itemsTaken >  _itemsRemaining || _itemsTaken ===  _itemsRemaining  ) {
-                      //
-                       console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Value Checks Passed")
-                      // So We assumme that all the products were taken, i.e itemsRemaining will always be 0, untill we update the value
-                       console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Status for this.searchProductId_inSodEodItems(_availableItemsProductId[" + _availableItemsProductId +"]"  + this.searchProductId_inSodEodItems(_availableItemsProductId))
-
-                      const estimateLenght = this.priceEstimates.length;
-                      const sodEodDbLenght = this.sod_eod_list.length;
-                      // Lets Start assigning 
-
-
-                      let updatedPriceEstimates: EstimatedPricing ={
-                        productId:_availableItemsProductId, 
-                        estimatedSelling: sellingPrice * _itemsTaken,
-                        actualSelling: sellingPrice * ( _itemsTaken - _itemsRemaining),
-                        lastUpdated: _sodEodDate
-                      }
-
-  
-                      let updatedAvaialbleItems : AvailableItems = {
-                        productId: _availableItemsProductId,
-                        itemsRemaining: ( _itemsAvailable - ( _itemsTaken - _itemsRemaining) ),
-                        lastUpdated:_sodEodDate
-            
-                      }
-  
-
-                      
-                      let updatedSodEod: SOD_EOD= {
-                        productId: _availableItemsProductId,
-                        itemsTaken: _itemsTaken,
-                        itemsRemaining: _itemsRemaining,
-                        lastUpdated: _sodEodDate,
-                        productName: _productName
-                      }
-
-
-                      if(estimateLenght > 0 ){
-                        // When there are some values inside Price Estimate now lets loops in and check for product Id to update
-                        let estimateFound = false;
-
-                        estimateFound = this.searchProductId_inEstimates(_availableItemsProductId);
-
-
-                        // Check if product Id was found on estimates
-                        if(estimateFound === false ){
-                          // If Estimate was not found, Let add it 
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": No estimates found for Id[" + _availableItemsProductId + "]")
-
-                          this.addEstimates(updatedPriceEstimates).subscribe(
-                            response => {
-                               console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully added")
-                            }, error=>{
-                              this.showError(JSON.stringify(error))
-                            }
-                          )
-
-                          if(updatedAvaialbleItems.itemsRemaining >= 0){
-
-                            this.updateAvailableItems(updatedAvaialbleItems).subscribe(
-                              response => {
-                                 console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully updateAvailableItems")
-
-                              }, error=>{
-
-                                this.showError(JSON.stringify(error))
-                                console.log( functionName + JSON.stringify(error))
-
-                              }
-                            )
-
-                          }else{
-                            this.showError('No Items to deduct from id ' + updatedAvaialbleItems.productId + ']' );
-                            console.error('No Items to deduct from id ' + updatedAvaialbleItems.productId + ']')
-                          }
-
-                        }else{
-                          // If Estimate was found, Let update it 
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Id[" + _availableItemsProductId + "] was found in estimates")
-
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ****** Values to Add to DBA *******");
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedPriceEstimates", updatedPriceEstimates);
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedAvaialbleItems", updatedAvaialbleItems );
-                          // console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedPriceTracing",updatedPriceTracing )
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedSodEod",updatedSodEod )
-                          
-                           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ***********************");
-                          
-                          this.updateEstimates(updatedPriceEstimates).subscribe(
-                            response => {
-                               console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully updateEstimates")
-                            }, error=>{
-                              this.showError("Error in updateEstimates()")
-                            }
-                          )
-                          this.updateAvailableItems(updatedAvaialbleItems).subscribe(
-                            response => {
-                               console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully updateAvailableItems")
-
-                            }, error=>{
-                              this.showError("Error in updateAvailableItems()")
-
-                            }
-                          )
-
-                        }
-
-                        
-                      }else{
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Theres nothing inside priceEstimates - Lenght of ", estimateLenght );
-
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ****** Values to Add to DBA *******");
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedPriceEstimates", updatedPriceEstimates);
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedAvaialbleItems", updatedAvaialbleItems );
-                        // console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedPriceTracing",updatedPriceTracing )
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": updatedSodEod",updatedSodEod )
-                        
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": ***********************");
-
-                        this.addEstimates(updatedPriceEstimates).subscribe(
-                          response => {
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully addEstimates")
-                          }, error=>{
-                            this.showError(JSON.stringify(error))
-                          }
-                        )
-                        this.updateAvailableItems(updatedAvaialbleItems).subscribe(
-                          response => {
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully updateAvailableItems ")
-
-                          }, error=>{
-                            this.showError(JSON.stringify(error))
-
-                          }
-                        )
-                        
-
-                      }
-
-                      if(sodEodDbLenght > 0 ){
-                        this.sodEodDbFound = false;
-
-                        this.sodEodDbFound = this.searchProductId_inSodEodItems(_availableItemsProductId);
-
-                      if(this.sodEodDbFound === true){
-                        // If SodEod was found = send Update
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product Id [" +_availableItemsProductId  + "] was found in sodEodDbFound");
-
-                        this.updateSodEod(updatedSodEod).subscribe(
-                          response => {
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully Updated Sod Eod Records")
-                          }, error=>{
-                            this.showError(JSON.stringify(error))
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Error in updateSodEod", JSON.stringify(error))
-
-                          }
-
-                        )
-
-                      }else{
-                        
-                         console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Product Id [" +_availableItemsProductId  + "] was NOT in sodEodDbFound", this.sod_eod_list );
-
-                        // If SodEod was NOT found = send Add
-                        this.addSodEod(updatedSodEod).subscribe(
-                          response => {
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully added addSodEod")
-                          }, error=>{
-                            this.showError(JSON.stringify(error))
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Error in addSodEod", JSON.stringify(error))
-
-                          }
-
-                        )
-                      }
-
-
-                      }else{
-                        // nothing inside the Sod Eod from DB, Insert its a must
-                         // If SodEod was NOT found = send Add
-                         this.addSodEod(updatedSodEod).subscribe(
-                          response => {
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Sucessfully added addSodEod")
-                          }, error=>{
-                            this.showError(JSON.stringify(error))
-                             console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Error in addSodEod", JSON.stringify(error))
-
-                          }
-
-                        )
-                      }
-
-                  }else{
-
-                     console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": Incorrect Values Entered, Items Remaining ["+ 
-                    _itemsRemaining + "]" +" can never be above what you took _itemsTaken[" + _itemsTaken + "] ")
-                    break;
-
-                  }
-
-
-
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": *****************************************");
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": productPricingList - sellingPrice", sellingPrice);
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": PRICE TRACING - accumulatedAmount", accumulatedAmount );
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD_EOD -  _itemsTaken",_itemsTaken )
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD_EOD - _itemsRemaining",_itemsRemaining )
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD_EOD -  _date",_sodEodDate )
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": SOD_EOD -  _productName",_productName )
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": AVAILABLE ITEMS -_itemsAvailable",_itemsAvailable )
-                   console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": *****************************************");
-                 
-
-                }
-
-              }
-
-
-            }
-
-
-          }
-
-        }else{
-           console.log( functionName + this.dateTimeService.formatPartial(Date.now()) + ": priceTracing is empty" )
-        }
-
-
-
-        break;
-      }
-
-      // At the end of If statement for _sod_eodProductId === _availableItemsProductId
-      if(this.availableItemFound == false){
-        // let add the available Items 
-
-      }
-
-
-    } // end of for loop
-
-  }
-
-  */
-    
-    
-
-  }else{
-
-
+    if (!requests.length) {
+      this.showError(problems.length ? problems.join(' | ') : 'Nothing to save');
+      return false;
     }
 
-    return false;
-  }
+    this.showLoading('Saving SOD/EOD…');
+    forkJoin(requests).pipe(finalize(() => this.hideLoading())).subscribe(results => {
+      const ok = results.filter(r => r.ok);
+      const failed = results.length - ok.length;
+      ok.forEach(r => this.removeSodEodByProductId(r.productId));
 
-
-creditAvailableItems(){
-
-  // List Aval Item to deduct or credit 
-
-
-}
-debitAvailableItems(){
-
-  // List Aval Item to deduct or credit 
-
-
-}
-
-searchProductId_inSodEodItems(productIdToMatch: number): boolean {
-
-    let matchFound = false;
-
-    for (let sodEodDb of this.sod_eod_list.values()) {
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": searchProductId_inSodEodItems - Now searching for ProductId["+ productIdToMatch + "] in  ", sodEodDb);
-
-        if (sodEodDb.productId === productIdToMatch) {
-          matchFound = true;
-           console.log(this.dateTimeService.formatPartial(Date.now()) + ": searchProductId_inSodEodItems - Match Found for ProductId["+ productIdToMatch + "] in  ");
-          break;
-        }
-  
-    }
-    return matchFound;
-}
-
-  searchProductId_inEstimates(productIdToMatch: number): boolean {
-    let matchFound =false;
-
-// console.log(this.dateTimeService.formatPartial(Date.now()) + ": this.priceEstimates", this.priceEstimates)
-    for(let estimates of this.priceEstimates.values() ){
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": searchProductId_inEstimates - Now searching for ProductId["+ productIdToMatch + "] in  ", estimates);
-      if(estimates.productId === productIdToMatch){
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": searchProductId_inEstimates - Match Found for ProductId["+ productIdToMatch + "] in  ");
-
-        matchFound =  true;
-        break;
+      if (!failed && !problems.length) {
+        this.showSuccess(`✅ Saved SOD/EOD for ${ok.length} product(s)`);
+      } else {
+        this.showError(`Saved ${ok.length}, failed ${failed}. ${problems.join(' | ')}`);
       }
-     
-    }
-
-return matchFound;
-  }
-
-  addStock(_stockitems:StockItems) : Observable<void[]>{
-
-    this.fullApiUrl = this.apiUrl + "addStock";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture():" +  this.fullApiUrl);
-  
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": DAta to be added");
-    console.log(_stockitems);
-  
-
-    // Increment AvailableItems for each item to be added
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": *************** Done Updating Stock yo DB ***************");
-
-    return  this.http.post<void[]> (this.fullApiUrl, _stockitems) ;
-    
-  }
-
-  uploadInagSSe(_formData:FormData): Observable<any>{
-    let success = false;
-
-   return this.http.post<any>(`environment.nodejs.full_api_path}/images/temp?key=${this.generateStockId}`, _formData, {
-      reportProgress: true,
-      observe: 'events'
+      // re-read so priceTracing / availableItems / sod_eod_list aren't stale for the next save
+      if (ok.length) this.loadAllProductDetails(true);
     });
- 
-}
 
-  uploadImage(_formData:FormData): Observable<any>{
-    let success = false;
-
-    
-   return this.http.post<any>(`${environment.nodejs.full_api_path}/uploadImages`, _formData, {
-      reportProgress: true,
-      observe: 'events'
-    });
- 
-}
-
-  addStockedItems_HTTP(_stockitems:StockedItems) : Observable<any>{
-
-    this.fullApiUrl = this.apiUrl + "addStockedItems";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture():" +  this.fullApiUrl);
-  
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": addStockedItems DAta to be added");
-    console.log(_stockitems);
-  
-
-    // Increment AvailableItems for each item to be added
-
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": *************** Done Updating Stock yo DB ***************");
-
-    return  this.http.post<any> (this.fullApiUrl, _stockitems) ;
-    
-  }
-
-//updating available list
-
-updateAvailableItems(availableItems:AvailableItems) : Observable<any>{
-
-  this.fullApiUrl = this.apiUrl + "updateAvailableItems";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture():" +  this.fullApiUrl);
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Values to add to db ", availableItems);
-
-  return  this.http.put<any> (this.fullApiUrl, availableItems);
-  
-}
-
-
-  selectedFiles: FileList | null = null;
-  message: string = '';
-  fileName: string= "";
-  fileType: string= "";
-  newFileName: string= "";
-  fileSize: number= 0;
-
-   key: string= "";
-  
-  uploadImages_HTTP(_formData: FormData) : Observable<void>{
-    
-//    this.fullApiUrl = this.apiUrl + "upload";
-    this.fullApiUrl =  environment.nodejs.full_api_path +  '/uploadImages'
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Adding To Products using API  : " +  this.fullApiUrl);
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Values to be added \n");
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": _formData", _formData);
- 
-    return this.http.post<void>( this.fullApiUrl, _formData);
-
-  }
- 
-  getImages(): Observable<any[]> {
-    
-    this.fullApiUrl = this.apiUrl + "getImages";
-
-    return this.http.get<any[]>(this.fullApiUrl);
-  }
-
-  getImagesById(id :number): Observable<Blob> {
-    
-    this.fullApiUrl = this.apiUrl + "getImages";
-
-    return this.http.get<Blob>(this.fullApiUrl +`/${id}`);
-  }
-
-uploadImages(): void {
-
-  
-
-  
-  if (this.selectedFiles && this.selectedFiles.length > 0) {
-
-    const formData = new FormData();
-    
-    for (let i = 0; i < this.selectedFiles.length; i++) {
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": [" + i + "]: " + "this.selectedFiles[i]" + 
-        this.selectedFiles[i] + "this.selectedFiles[i].name"+ this.selectedFiles[i].name);
-      formData.append('images', this.selectedFiles[i], this.selectedFiles[i].name);
-    }
-
-    this.uploadImages_HTTP(formData).subscribe(
-      (response) => {
-        this.uploadMessage = 'Images uploaded successfully!';
-      },
-      (error) => {
-        this.uploadMessage = 'Error uploading images! \n';
-        console.error('Error:', error);
-      }
-    );
-  } else {
-    this.uploadMessage = 'Please select images to upload!';
-  }
-}
-// Makke  HTTP Calls
-
-
-
-saveStockChanges(stockToSave:StockItems, _availableItems:AvailableItems[]):void{
-
-  let found = false;
-
-  let _tempAvailableItems : AvailableItems = {
-
-    productId:stockToSave.productId.valueOf(),
-    itemsRemaining: stockToSave.productQuantity,
-    lastUpdated: this.dateTimeService.normalizeDate((new Date(stockToSave.lastUpdated).toString()  ) )
-  }
-
-
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": Locally defined _availableItems before increment  ", _tempAvailableItems );
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": Alreaady saved this addAvailableItems", _availableItems);
-
-
-if(this.availableItems.length>0){
-  for (let i = 0; i < _availableItems.length; i++) {
-    // Check if the current product's productId matches the productId to find
-    if (_availableItems[i].productId === _tempAvailableItems.productId) {
-        // Return the product found
-
-        _tempAvailableItems.itemsRemaining +=_availableItems[i].itemsRemaining; // Inrement Quantity
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Found Product Id [" +_tempAvailableItems.productId + "] on [" + i +"]")
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Incremented value", _tempAvailableItems)
-        //this.updateAvailableItems(_availableItems[i]).subscribe();
-        found= true;
-        this.addStock(stockToSave).subscribe(
-          next=> {
-
-            this.updateAvailableItems(_tempAvailableItems).subscribe(
-              next=>{
-                   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done adding Stock and Incrementing")
-              }
-            )
-          }
-        )
-
-
-        break;
-        
-    }else{
-     //   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Object [" + _tempAvailableItems.productId + "] was not foundon [" + i +"]" )
-      // Time to call for ForkJoint
-      // Theres nothing to update, we will add a fresh Available Item record
-      
-      // *************************  Add code
-      //  console.log(this.dateTimeService.formatPartial(Date.now()) + ": ForkJoin: \n Theres nothing to update, we will add a fresh Available Item record")
-
-    }
-} //end of for Looop
-/// When the id is not found 
-}else{
-  ///
-          // Time to call for ForkJoint
-      // Theres nothing to update, we will add a fresh Available Item record
-      
-      // *************************  Add code
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": ForkJoin: \n The Object is Empty, we will add a fresh Available Item record")
-
-  
-
-
-}
-
-
-if(found === false){
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Object [" + _tempAvailableItems.productId + "] was not found" )
-
-
-// Now add stock items to dba Stock Items
-  forkJoin({
-
-    respond1:this.addAvailableItems(_tempAvailableItems),
-    respond2: this.addStock(stockToSave)
-
-  }).subscribe({
-    next:(Response) =>{
-
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done Adding AvailableItem ",Response.respond1);
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done Adding Stock",Response.respond2);
-
-    }
-  })
-
-
-}
-
-
-}// End of SaveStockChanges
-
-// Send SodEod Staff
-
-sendEodSodToDatabase(){
-
-}
-
-  // Increament Damages of Avaible Items for the Available Items DB
-IncrementAvailableItems(_availableItems: AvailableItems[], productIdToFind: number, newQuantity:number): AvailableItems | null {
-  
-  // Create a new Date
-  const tempDate = new Date();
-  
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Now incrementing Available Items");
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": current data in _availableItems ", _availableItems)
-
-  // Iterate through the array of products
-
-    if(_availableItems.length>0){
-      for (let i = 0; i < _availableItems.length; i++) {
-        // Check if the current product's productId matches the productId to find
-        if (_availableItems[i].productId === productIdToFind) {
-            // Return the product found
-  
-            _availableItems[i].itemsRemaining +=newQuantity; // Inrement Quantity
-  
-            //this.updateAvailableItems(_availableItems[i]).subscribe();
-            
-            return _availableItems[i];
-        }else{
-
-             console.log(this.dateTimeService.formatPartial(Date.now()) + ": Searhing index ["  + i + "] still didnt find anything")
-                
-  
-        }
-    } //end of for Looop
-    /// When the id is not found 
-
-
-
-    }else{
-      ///
-      
-      // adding the reuired data to db
-
-      
-
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Objet is empty");
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Object [" + productIdToFind + "] was not found" );
-
-      let temp :AvailableItems ={
-       productId:productIdToFind,
-        itemsRemaining:0,
-        lastUpdated: this.dateTimeService.normalizeDate(tempDate.toString())
-      }
-       console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done creating Object  [" + productIdToFind + "] " );
-
-      _availableItems.push(temp);
-
-
-
-      //re-try
-      for (let i = 0; i < _availableItems.length; i++) {
-
-        if (_availableItems[i].productId === productIdToFind) {
-          // Return the product found
-            _availableItems[i].itemsRemaining += newQuantity;
-             console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done incrementing Available Items for Object [" + productIdToFind + "]" );
-
-            // add the new Object
-           // this.addAvailableItems(_availableItems[i]).subscribe();
-            
-            // refresh the object with new variable
-           // this.refreshAvailableItems();
-            
-          return _availableItems[i];
-      }
-
-      }
-
-
-      
-
-
-    }
-  // If productId is not found, return null
-
-
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Object [" + productIdToFind + "] was not found" );
-
-  let temp :AvailableItems ={
-    productId:productIdToFind,
-    itemsRemaining:0,
-    lastUpdated:this.dateTimeService.normalizeDate(tempDate.toString())
-
-  }
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done creating Object  [" + productIdToFind + "] " );
-
-
-  for(let i=0;i <_availableItems.length; i++){
-    
-    if (_availableItems[i].productId === productIdToFind) {
-      // Return the product found
-        _availableItems[i].itemsRemaining += newQuantity;
-         console.log(this.dateTimeService.formatPartial(Date.now()) + ": Done incrementing Available Items for Object [" + productIdToFind + "]" );
-  
-                    // add the new Object
-               //     this.addAvailableItems(_availableItems[i]).subscribe();
-            
-                    // refresh the object with new variable
-               //     this.refreshAvailableItems();
-                    
-
-
-      return _availableItems[i];
-  }
-
-  }
-
-
-
-  return null;
-}
-
-  getStockList() : Observable<ApiResponse<StockItems[]>>{
-    this.fullApiUrl =     this.apiUrl + "getallStock";
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture():" +  this.fullApiUrl);
-
-    return this.http.get<ApiResponse<StockItems[]>> ( this.fullApiUrl) ;
-
-  }
-////////////////////////
-
-refreshAvailableItems(): void{
-
-this.getAvailableItems().subscribe(
-  data=> {
-    this.availableItems =data.data;
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Successfully Read Available Items");
-  }
-)
-
-}
-checkForAvailableItems(productId:number):Boolean{
-
-
-    let availableItemFound:Boolean=false;
-
-      
-    if(this.availableItems.length > 0){
-      for(let allAvailableItems of this.availableItems){
-
-        if(productId === allAvailableItems.productId){
-            
-          availableItemFound = true;
-
-          console.log(this.dateTimeService.formatDate(Date.now() + 
-" checkForAvailableItems status is [" + availableItemFound +"]"))
-
-          return availableItemFound
-        }
-
-      }
-    }
-
-console.log(this.dateTimeService.formatDate(Date.now() + 
-" checkForAvailableItems status is [" + availableItemFound +"]"))
-      return availableItemFound;
-
-}
-
-
-addAvailableItems(availableItems:AvailableItems) : Observable<void>{
-
-  this.fullApiUrl = this.apiUrl  + "addAvailableItems";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture():" +  this.fullApiUrl);
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": DAta to be added");
-  console.log(availableItems);
-
-
-
-
-
-
-  return  this.http.post<void> (this.fullApiUrl, availableItems) ;  
-}
-
-findAnyByProductId(searchedArray : any, productIdToFind:number): boolean{
- console.log(this.dateTimeService.formatPartial(Date.now()) + ": Searching for : " + productIdToFind + " on ", searchedArray);
-
-  if(searchedArray.productId === productIdToFind){
     return true;
-}
-else{
-  return false
-}
-
-}
-
- // Function to find the index of a product by productId and return the product
- findProductByProductId(products: ProductList[], productIdToFind: number): ProductList | null {
-  
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Finding Product ID => ", productIdToFind)
-  // Iterate through the array of products
-  for (let i = 0; i < products.length; i++) {
-      // Check if the current product's productId matches the productId to find
-      if (products[i].productId === productIdToFind) {
-          // Return the product found
-          
-          return products[i];
-      }
   }
-  // If productId is not found, return null
-  return null;
-}
 
-getAvailableItems() : Observable<ApiResponse<AvailableItems[]>>{
+  // ═══════════════════════════════════════════════════════════════════
+  //  NEW STOCK  (FIX #26)
+  // ═══════════════════════════════════════════════════════════════════
 
-  this.fullApiUrl = this.apiUrl + "getallAvailableItems";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getCapture(): " + this.fullApiUrl);
-  return this.http.get<ApiResponse<AvailableItems[]>> (this.fullApiUrl) ;
+  // FIX #27: price/quantity went through JSON.stringify -> parseFloat, and getProductNameById/AvailableItemsById
+  // returned ''/0 because they were async
+  createNewStockMatTable(product: ProductList, yummyList: YummyList): AddNewStock {
+    const productId = Number(yummyList.productId);
+    return {
+      productId,
+      productName: product?.productName || this.getProductNameById(productId),
+      productPrice: Number(yummyList.productPrice),
+      numOfPacks: 1,
+      lastUpdated: this.dateTimeService.normalizeDate(Date.now()),
+      productQuantity: Number(yummyList.productQuantity),
+      availableItems: this.getAvaialableItemsById(productId),
+      date: this.dateTimeService.normalizeDate(new Date())
+    };
+  }
 
-}
-getPriceTracing() : Observable<ApiResponse<PriceTracing[]>>{
-  this.fullApiUrl = this.apiUrl + "getPriceTracing";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getPriceTracing(): " +  this.fullApiUrl);
-  return this.http.get<ApiResponse<PriceTracing[]>> (this.fullApiUrl);
+  generateStockId(): number {
+    const uniqueString = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    return this.convertToNumber(Math.abs(this.hashCode(uniqueString)));
+  }
 
-}
-
-addPriceTracing(_priceTracing:PriceTracing) : Observable<void>{
-
-  this.fullApiUrl = this.apiUrl + "addPriceTracing";
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for addPriceTracing():" +  this.fullApiUrl);
-
-  //console.log();
-
-  return  this.http.post<void> (this.fullApiUrl, _priceTracing);
-}
-
-getEstimates() : Observable<ApiResponse<EstimatedPricing[]>>{
-  this.fullApiUrl =  this.apiUrl +"getEstimates";
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for getEstimates():" + this.fullApiUrl);
-  return this.http.get<ApiResponse<EstimatedPricing[]>> ( this.fullApiUrl);
-
-}
-updateEstimates(_estimates:EstimatedPricing) :Observable <void>{
-
-
-  this.fullApiUrl =  this.apiUrl + "updateEstimates";
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for updateEstimates():" +  this.fullApiUrl);
-
-  return  this.http.put<void> (this.fullApiUrl, _estimates) ;
-
-}
-
-addEstimates(_estimates:EstimatedPricing) : Observable<void>{
-
-
-
-  this.fullApiUrl =  this.apiUrl + "addEstimates";
-
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": API Get  Path for addEstimates(): " + this.fullApiUrl);
-
-  return this.http.post<void> (this.fullApiUrl, _estimates) ;
-  
-}
-
-introductProdcutId(objectName: string, _id:number): void {
-   console.log(this.dateTimeService.formatPartial(Date.now()) + ": Creating Product Id for ", objectName)
-
-  if(objectName === "priceTracing"){
-    
-    let introducedPriceTracing :PriceTracing ={
-      productId:_id, 
-      accAmount:0,
-      lastUpdated: this.dateTimeService.normalizeDate(Date.now().toString())
-      
+  hashCode(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = (hash << 5) - hash + str.charCodeAt(i);
+      hash |= 0;
     }
-  }else{
-     console.log(this.dateTimeService.formatPartial(Date.now()) + ": Invalid Option Selected")
+    return hash;
   }
 
+  /**
+   * FIX #26: newStockedItems / newAvailableItems were instance fields that were NEVER cleared
+   * (the splice(0) calls were commented out) so every call re-posted all previous batches -> duplicate
+   * StockedItems and stock incremented again and again. Also the local availableItems cache was stale after
+   * an add, so a second add for a brand-new product INSERTed a second AvailableItems row.
+   */
+  finalizeNewStock(newStockItems: AddNewStock[]): void {
+    if (!newStockItems?.length) { this.showError('No stock items to save'); return; }
 
-}
-  
+    const stockId = this.generateStockId();
+    const problems: string[] = [];
+    const seen = new Set<number>();
+    const jobs: Observable<{ productId: number; ok: boolean; after?: AvailableItems }>[] = [];
+
+    this.newStockedItems = [];
+    this.newAvailableItems = [];
+
+    for (const stock of newStockItems) {
+      const productId = Number(stock.productId);
+      const label = stock.productName || `#${productId}`;
+      const packs = Number(stock.numOfPacks);
+      const perPack = Number(stock.productQuantity);
+      const price = Number(stock.productPrice);
+
+      if (seen.has(productId)) { problems.push(`${label}: listed twice`); continue; }
+      seen.add(productId);
+      if (!(packs > 0) || !(perPack > 0) || Number.isNaN(price)) { problems.push(`${label}: invalid packs/quantity/price`); continue; }
+
+      const stockQuantity = packs * perPack;
+      const stocked: StockedItems = {
+        stockId,
+        productId,
+        stockDate: stock.lastUpdated,
+        stockPrice: price * packs,
+        stockQuantity
+      };
+
+      // read the CURRENT quantity, not the value captured when the checkbox was ticked
+      const exists = this.checkForAvailableItems(productId);
+      const current = exists ? this.getProductItemsRemaining(productId) : 0;
+      const after: AvailableItems = {
+        productId,
+        itemsRemaining: current + stockQuantity,
+        lastUpdated: this.dateTimeService.normalizeDate(stock.lastUpdated)
+      };
+
+      this.newStockedItems.push(stocked);
+      this.newAvailableItems.push(after);
+
+      jobs.push(
+        this.addStockedItems_HTTP(stocked).pipe(
+          concatMap(() => (exists ? this.updateAvailableItems(after) : this.addAvailableItems(after)) as Observable<any>),
+          map(() => ({ productId, ok: true, after })),
+          catchError(err => {
+            problems.push(`${label}: ${this.msg(err)}`);
+            return of({ productId, ok: false });
+          })
+        )
+      );
+    }
+
+    if (!jobs.length) { this.showError(problems.join(' | ') || 'Nothing to save'); return; }
+
+    this.showLoading('Saving new stock…');
+    forkJoin(jobs).pipe(finalize(() => this.hideLoading())).subscribe(results => {
+      const ok = results.filter(r => r.ok);
+      ok.forEach(r => r.after && this.upsertLocalAvailable(r.after));
+
+      if (ok.length === results.length && !problems.length) {
+        this.checkedItems.splice(0);
+        this.checkBoxSelectedProducts_AddNew.data = [];
+        this.showSuccess(`✅ Stock saved for ${ok.length} product(s)`);
+      } else {
+        // keep the failed rows in the table so the user can retry them
+        const okIds = new Set(ok.map(r => r.productId));
+        this.checkedItems = this.checkedItems.filter(c => !okIds.has(Number(c.productId)));
+        this.checkBoxSelectedProducts_AddNew.data = [...this.checkedItems];
+        this.showError(`Saved ${ok.length}, failed ${results.length - ok.length}. ${problems.join(' | ')}`);
+      }
+      if (ok.length) this.loadAllProductDetails(true);
+    });
+  }
+
+  saveStockChanges(stockToSave: StockItems, _availableItems: AvailableItems[]): void {
+    const productId = Number(stockToSave.productId);
+    const source = _availableItems?.length ? _availableItems : this.availableItems;
+    const existing = source.find(a => Number(a.productId) === productId);
+
+    const updated: AvailableItems = {
+      productId,
+      itemsRemaining: Number(stockToSave.productQuantity) + (existing ? Number(existing.itemsRemaining) : 0),
+      lastUpdated: this.dateTimeService.normalizeDate(new Date(stockToSave.lastUpdated).toString())
+    };
+
+    // sequential: stock first, then the availability that depends on it (the old "not found" path ran them in parallel)
+    this.addStock(stockToSave).pipe(
+      concatMap(() => (existing ? this.updateAvailableItems(updated) : this.addAvailableItems(updated)) as Observable<any>)
+    ).subscribe({
+      next: () => { this.upsertLocalAvailable(updated); this.showSuccess('Stock saved'); },
+      error: err => this.showError(err)
+    });
+  }
+
+  IncrementAvailableItems(_availableItems: AvailableItems[], productIdToFind: number, newQuantity: number): AvailableItems | null {
+    let item = _availableItems.find(a => Number(a.productId) === Number(productIdToFind));
+    if (!item) {
+      item = {
+        productId: productIdToFind,
+        itemsRemaining: 0,
+        lastUpdated: this.dateTimeService.normalizeDate(new Date().toString())
+      };
+      _availableItems.push(item);
+    }
+    item.itemsRemaining += newQuantity;
+    return item;
+  }
+
+  refreshAvailableItems(): void {
+    this.getAvailableItems().subscribe({
+      next: res => {
+        this.availableItems = this.coerce<AvailableItems>(this.unwrap(res), ['productId', 'itemsRemaining']);
+        this.availableItems$.next(this.availableItems);
+      },
+      error: err => this.showError(err)
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  DELETE  (FIX #28)
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Observable version – prefer this. */
+  deleteAllProductData$(productId: number): Observable<ApiResponse<any>> {
+    return this.httpClientService.delete<ApiResponse<any>>('deleteAllProductData', productId, 'deleteAllProductData');
+  }
+
+  /** Old Tracer-style API. The returned object is filled in when the response arrives. */
+  deleteAllProductData(productId: number): Tracer {
+    const t: Tracer = { status: false, message: 'Deleting…' };
+    this.deleteAllProductData$(productId).subscribe({
+      next: r => { t.status = !!r.success; t.message = String(r.message ?? ''); },
+      error: e => { t.status = false; t.message = this.msg(e); }
+    });
+    return t;
+  }
+
+  /**
+   * The old version read `status.status` immediately after firing the request (always false), so it always
+   * showed an empty error, left the "loading" snackbar open forever and never refreshed the lists.
+   */
+  deleProduct(id: number): void {
+    if (!id) throw new Error('Invalid id provided to deleteProduct');
+
+    this.showLoading(`🟡 Deletion initiated for id [${id}]...`);
+    this.deleteAllProductData$(id).pipe(finalize(() => this.hideLoading())).subscribe({
+      next: res => {
+        if (res && res.success === false) {
+          this.showError(String(res.message ?? 'Delete failed'));
+        } else {
+          this.showSuccess(String(res?.message ?? `Product [${id}] deleted`));
+          this.loadAllProductDetails(true);
+        }
+      },
+      error: err => this.showError(err)
+    });
+  }
+
+  /**
+   * @deprecated 7 separate deletes with forkJoin fail fast: if one fails the others may already have run,
+   * leaving orphan rows (a classic source of "duplicate id" problems). Use deleProduct()/deleteAllProductData$()
+   * which is a single server-side call (ideally one DB transaction).
+   */
+  deleteProductSS(id: number): void {
+    if (!id) throw new Error('Invalid id provided to deleteProduct');
+
+    forkJoin([
+      this.removeAvailableItemsById(id),
+      this.removeProductList(id),
+      this.removeEstimateById(id),
+      this.removeSodEodById(id),
+      this.removePriceTracing(id),
+      this.removeProductItemPricing(id),
+      this.removeStockedItems(id)
+    ]).subscribe({
+      next: () => { this.showSuccess(`✔️ All delete operations completed successfully for id [${id}]`); this.loadAllProductDetails(true); },
+      error: error => this.showError(`Delete operations failed for id [${id}]: ${this.msg(error)}`)
+    });
+  }
+
+  deleteData(productId: number): Observable<any> {
+    return this.http.delete<any>(this.url('deleteProductbyId'), { body: { productId } });
+  }
+
+  removeStockItemsS(id: number): Observable<any> {
+    return this.http.delete<any>(this.url('removeStockedItems/' + id));
+  }
+
+  removeStockedItems(id: number): Observable<any> {
+    if (!id) throw new Error('Invalid id provided to removeStockedItems');
+    return this.httpClientService.delete<StockedItems>('removeStockedItems', id, 'removeStockedItems');
+  }
+
+  removeProductItemPricing(id: number): Observable<any> {
+    if (!id) throw new Error('Invalid id provided to removeProductItemPricing');
+    return this.httpClientService.delete<ProductItemPricing>('removeProductItemPricing', id, 'removeProductItemPricing');
+  }
+
+  removePriceTracing(id: number): Observable<any> {
+    if (!id) throw new Error('Invalid id provided to removePriceTracing');
+    return this.http.delete<any>(this.url('removePriceTracing/' + id));
+  }
+
+  removeProductList(id: number): Observable<any> {
+    return this.httpClientService.delete<ProductList>('deleteProduct', id, 'deleteProduct');
+  }
+
+  removeEstimateById(id: number): Observable<any> {
+    return this.httpClientService.delete<EstimatedPricing>('removeEstimateById', id, 'removeEstimateById');
+  }
+
+  removeAvailableItemsById(id: number): Observable<any> {
+    return this.httpClientService.delete<AvailableItems>('removeAvailableItemsById', id, 'removeAvailableItemsById');
+  }
+
+  removeSodEodById(id: number): Observable<any> {
+    if (!id) throw new Error('Invalid id provided to removeSodEodById');
+    return this.httpClientService.delete<SOD_EOD>('removeSodEodById', id, 'removeSodEodById');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  UPDATES
+  // ═══════════════════════════════════════════════════════════════════
+
+  updateProductPricing(_api: string, pricing: productPricing): Observable<void[]> {
+    return this.http.put<void[]>(this.url('updateProductPricing'), pricing);
+  }
+
+  updateProductItemPricing(productItemPricing: ProductItemPricing): Observable<void[]> {
+    return this.http.put<void[]>(this.url('updateProductItemPricing'), productItemPricing);
+  }
+
+  updateYummyList(productPricing: ProductPricing): Observable<ProductPricing> {
+    return this.http.put<ProductPricing>(this.url('updatePricingList'), productPricing);
+  }
+
+  httpCall_UpdateYUmmyList(yummyList: YummyList): void {
+    const pricing: ProductPricing = {
+      productId: yummyList.productId,
+      productSize: yummyList.productSize,
+      productQuantity: yummyList.productQuantity,
+      costPerItem: yummyList.costPerItem,
+      productProfit: yummyList.productProfit,
+      sellingPrice: yummyList.sellingPrice,
+      productCommission: yummyList.productCommission,
+      itemGrouping: yummyList.itemGrouping
+    };
+    this.updateYummyList(pricing).subscribe({
+      next: () => this.showSuccess('Successfully updated YummyList'),
+      error: err => this.showError(err)
+    });
+  }
+
+  /** Returns a Tracer that is filled in when the updates finish (same contract as before, now with a proper message). */
+  updateYummyListTable(
+    productList: ProductList[],
+    pricingList: ProductPricing[],
+    availableItems: AvailableItems[],
+    priceTracingList: PriceTracing[]
+  ): Tracer {
+    const t: Tracer = { status: false, message: '' };
+    const product = productList?.[0];
+    const pricing = pricingList?.[0];
+    const available = availableItems?.[0];
+    const tracing = priceTracingList?.[0];
+
+    if (!product || !pricing || !available || !tracing) {
+      t.message = '❌ Missing one or more required data objects for updating.';
+      return t;
+    }
+
+    t.message = 'Updating…';
+    forkJoin([
+      this.updateProductListByID('updateProductList', product),
+      this.updateProductPricing('updateProductPricing', pricing),
+      this.updateAvailableItems(available),
+      this.updatePriceTracing(tracing),
+      this.updateYummyList(pricing)
+    ]).subscribe({
+      next: () => { t.status = true; t.message = '✅ YummyList row updated successfully.'; this.loadAllProductDetails(true); },
+      error: err => { t.status = false; t.message = `❌ Failed to update YummyList row: ${this.msg(err)}`; }
+    });
+    return t;
+  }
+
+  updateSodEod(productList: SOD_EOD): Observable<void[]> {
+    return this.http.put<void[]>(this.url('updateSodEodItems'), productList);
+  }
+
+  updateProductListByID(_api: string, productList: ProductList): Observable<void[]> {
+    return this.http.put<void[]>(this.url('updateProductList'), productList);
+  }
+
+  updatePriceTracing(_priceTracing: PriceTracing): Observable<void[]> {
+    return this.http.put<void[]>(this.url('updatePriceTracing'), _priceTracing);
+  }
+
+  updateAvailableItems(availableItems: AvailableItems): Observable<any> {
+    return this.http.put<any>(this.url('updateAvailableItems'), availableItems);
+  }
+
+  updateEstimates(_estimates: EstimatedPricing): Observable<void> {
+    return this.http.put<void>(this.url('updateEstimates'), _estimates);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  HTTP – GET / ADD
+  // ═══════════════════════════════════════════════════════════════════
+
+  getProductItemPricing_HTTP(): Observable<ApiResponse<ProductItemPricing[]>> {
+    return this.http.get<ApiResponse<ProductItemPricing[]>>(this.url('getProductItemPricing'));
+  }
+
+  valid(validate: Login): Observable<void[]> {
+    return this.http.post<void[]>(this.url(api.validateUser), validate);
+  }
+
+  addProducts(product: ProductList): Observable<ProductList> {
+    return this.http.post<ProductList>(this.url('addProduct'), product);
+  }
+
+  addProductItemPricing_HTTP(product: ProductItemPricing): Observable<ProductItemPricing> {
+    return this.http.post<ProductItemPricing>(this.url('addProductItemPricing'), product);
+  }
+
+  getProductList(): Observable<ApiResponse<ProductList[]>> {
+    return this.httpClientService.get<ApiResponse<ProductList[]>>('getProductList', {}, 'productList');
+  }
+
+  getArrayFromResponse<T>(response: ApiResponse<T[]>): T[] {
+    return this.unwrap<T>(response);
+  }
+
+  getProductPricing(): Observable<ApiResponse<ProductPricing[]>> {
+    return this.httpClientService.get<ApiResponse<ProductPricing[]>>('/getallpricing', {}, 'productPricing');
+  }
+
+  // FIX #29: built `${apiUrl}/getProductPricing` (double slash AND a route that doesn't exist – the route is getallpricing)
+  getProductPricing_HTTP(): Observable<ApiResponse<ProductPricing[]>> {
+    return this.getProductPricing();
+  }
+
+  // FIX #29b: posted to the bare base URL instead of .../add2Pricing
+  addYummies(productPricing: productPricing): Observable<void[]> {
+    return this.http.post<void[]>(this.url('add2Pricing'), productPricing);
+  }
+
+  addSodEod(sodEodList: SOD_EOD): Observable<void[]> {
+    return this.http.post<void[]>(this.url('addSodEodItems'), sodEodList);
+  }
+
+  getSodEod(_api: string): Observable<ApiResponse<SOD_EOD[]>> {
+    return this.http.get<ApiResponse<SOD_EOD[]>>(this.url('getSodEodItems'));
+  }
+
+  getSodEodList(): Observable<MatTableSOD_EOD[]> {
+    return this.http.get<MatTableSOD_EOD[]>(this.url('getSodEodList'));
+  }
+
+  addStock(_stockitems: StockItems): Observable<void[]> {
+    return this.http.post<void[]>(this.url('addStock'), _stockitems);
+  }
+
+  addStockedItems_HTTP(_stockitems: StockedItems): Observable<any> {
+    return this.http.post<any>(this.url('addStockedItems'), _stockitems);
+  }
+
+  getStockList(): Observable<ApiResponse<StockItems[]>> {
+    return this.http.get<ApiResponse<StockItems[]>>(this.url('getallStock'));
+  }
+
+  addAvailableItems(availableItems: AvailableItems): Observable<void> {
+    return this.http.post<void>(this.url('addAvailableItems'), availableItems);
+  }
+
+  getAvailableItems(): Observable<ApiResponse<AvailableItems[]>> {
+    return this.http.get<ApiResponse<AvailableItems[]>>(this.url('getallAvailableItems'));
+  }
+
+  getPriceTracing(): Observable<ApiResponse<PriceTracing[]>> {
+    return this.http.get<ApiResponse<PriceTracing[]>>(this.url('getPriceTracing'));
+  }
+
+  addPriceTracing(_priceTracing: PriceTracing): Observable<void> {
+    return this.http.post<void>(this.url('addPriceTracing'), _priceTracing);
+  }
+
+  getEstimates(): Observable<ApiResponse<EstimatedPricing[]>> {
+    return this.http.get<ApiResponse<EstimatedPricing[]>>(this.url('getEstimates'));
+  }
+
+  addEstimates(_estimates: EstimatedPricing): Observable<void> {
+    return this.http.post<void>(this.url('addEstimates'), _estimates);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  IMAGES
+  // ═══════════════════════════════════════════════════════════════════
+
+  // FIX #30: template literal was missing the `${` and `generateStockId` was never called (function reference in the URL)
+  uploadInagSSe(_formData: FormData): Observable<any> {
+    return this.http.post<any>(
+      `${environment.nodejs.full_api_path}/images/temp?key=${this.generateStockId()}`,
+      _formData,
+      { reportProgress: true, observe: 'events' }
+    );
+  }
+
+  uploadImage(_formData: FormData): Observable<any> {
+    return this.http.post<any>(`${environment.nodejs.full_api_path}/uploadImages`, _formData, {
+      reportProgress: true,
+      observe: 'events'
+    });
+  }
+
+  uploadImages_HTTP(_formData: FormData): Observable<void> {
+    return this.http.post<void>(`${environment.nodejs.full_api_path}/uploadImages`, _formData);
+  }
+
+  getImages(): Observable<any[]> {
+    return this.http.get<any[]>(this.url('getImages'));
+  }
+
+  getImagesById(id: number): Observable<Blob> {
+    return this.http.get<Blob>(this.url('getImages') + `/${id}`);
+  }
+
+  uploadImages(): void {
+    if (this.selectedFiles && this.selectedFiles.length > 0) {
+      const formData = new FormData();
+      for (let i = 0; i < this.selectedFiles.length; i++) {
+        formData.append('images', this.selectedFiles[i], this.selectedFiles[i].name);
+      }
+      this.uploadImages_HTTP(formData).subscribe({
+        next: () => { this.uploadMessage = 'Images uploaded successfully!'; },
+        error: error => {
+          this.uploadMessage = 'Error uploading images!';
+          console.error('Error:', error);
+        }
+      });
+    } else {
+      this.uploadMessage = 'Please select images to upload!';
+    }
+  }
+
+  sendProducts(products: ProductList[]) {
+    const apiUrl = 'https://ai-worker-hono.lucky-sebothoma-3.workers.dev/api/r2';
+    const headers = new HttpHeaders({ 'Content-Type': 'application/json' });
+    return this.http.post(apiUrl, products, { headers, responseType: 'text' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  AUTH
+  // ═══════════════════════════════════════════════════════════════════
+
+  // FIX #31 (security): the old version console.logged the raw access token and ID-token claims.
+  getAccessToken(): any {
+    this.auth.getAccessTokenSilently().subscribe(token => {
+      this.sendTokensToBackend(token);
+    });
+  }
+
+  sendTokensToBackend(_token: string): void {
+    // intentionally empty – never log tokens
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MISC / UI
+  // ═══════════════════════════════════════════════════════════════════
+
+  addRow(): void {
+    this.tableData.push({ id: this.tableData.length + 1, name: 'New Row' });
+  }
+
+  addNewRow(obj: any): void {
+    this.tableData.push(obj);
+  }
+
+  addNewRowStock(obj: StockItems): void {
+    this.newStock_tableDate.push(obj);
+  }
+
+  addNewRowSOD_EOD(obj: SOD_EOD): void {
+    this.sod_eod_tableData.push(obj);
+  }
+
+  viewProducts(products: Product): void {
+    this.dbg('Viewing products', products);
+  }
+
+  formatDate(dateString: any): Date {
+    return this.dateTimeService.normalizeDate(dateString);
+  }
+
+  convertToNumber(value: any): number {
+    if (typeof value === 'string') return Number(value);
+    if (typeof value === 'boolean') return value ? 1 : 0;
+    if (typeof value === 'number') return value;
+    return NaN;
+  }
+
+  showLoading(message: string): void {
+    setTimeout(() => {
+      this.snackBar.open(this.msg(message), 'Close', { duration: 0, horizontalPosition: 'right', verticalPosition: 'top' });
+    });
+  }
+
+  hideLoading(): void {
+    this.snackBar.dismiss();
+  }
+
+  // FIX #32: JSON.stringify("text") wraps strings in quotes and turns an HttpErrorResponse into a wall of JSON
+  showSuccess(message: any): void {
+    setTimeout(() => {
+      this.snackBar.open(this.msg(message), 'Close', {
+        duration: this.snackBarDuration_Success,
+        horizontalPosition: 'right',
+        verticalPosition: 'top'
+      });
+    });
+  }
+
+  showError(message: any): void {
+    setTimeout(() => {
+      this.snackBar.open(this.msg(message), 'Close', {
+        duration: this.snackBarDuration_Failure,
+        horizontalPosition: 'center',
+        verticalPosition: 'bottom'
+      });
+    });
+  }
+
+  // ───────────── empty stubs kept only so existing templates/components still compile ─────────────
+  /** @deprecated no-op */ sendNewStockItems(): void { }
+  /** @deprecated no-op */ createProductList(): void { }
+  /** @deprecated no-op */ sendToDatabase(): void { }
+  /** @deprecated no-op */ creditAvailableItems(): void { }
+  /** @deprecated no-op */ debitAvailableItems(): void { }
+  /** @deprecated no-op */ sendEodSodToDatabase(): void { }
+  /** @deprecated no-op */ introductProdcutId(_objectName: string, _id: number): void { }
 }

@@ -1,25 +1,47 @@
 
 export const environment = {
-	production: true,
-//	apiUrl: 'https://192.168.0.140:8183'
+	production: false,
+  stock_nodejs_server_endpoint:"https://stock-backend:8080/api/stock/process", 
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
+//	apiUrl: 'https:/node-js.justdo-it.uk'
 	apiUrl: 'https://192.168.0.140:8183',
+
 	redisPostgres:"https://redisPostgres.justdo-it.uk",
 	auth:{ 
         domain: 'dev-3ocho460qagqipds.us.auth0.com',
         clientId: '5NZZICITa9LCg8U0dNQraVhGqNiEpUTi',
         audience:'https://linux.justdo-it.local:8083'
-    },cloudflare_proxy:{
-      webp:"https://expose_images.justdo-it.uk/webp",
-      loader:"https://expose_images.justdo-it.uk/loader"
     },
+ 
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-      local_images:"https://expose_images.justdo-it.uk/local_images"
+            local_images:"https://192.168.0.140:3007",
+            nginx:"https://192.168.0.140:3007",
+            hono:"https://192.168.0.140:3009/images",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+
     },
-    expose_image_gif:"https://expose_images.justdo-it.uk/images/gif",
+    expose_gif_failures:{
+            cross:"https://192.168.0.140:3007/failures/failure_cross.gif",
+            shake:"https://192.168.0.140:3007/failures/failure_shake.gif",
+            sad:"https://192.168.0.140:3009/failures/failure_sad.gif",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+
+    },expose_gif_loading:{
+            gear:"https://192.168.0.140:3007/loading/loading_gear.gif",
+            infinite:"https://192.168.0.140:3007/loading/loading_infinite.gif",
+            maze:"https://192.168.0.140:3009/loading/loading_maze.gif",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+
+    },cloudflare_proxy:{
+      webp:"https://192.168.0.140:3007/webp",
+      loader:"https://192.168.0.140:3007/loader" 
+
+    },
+        expose_image_gif:"https://192.168.0.140:3007/images/gif",
+
 	  nodejs:{
         full_api_path:'https://192.168.0.140:8183/api/v1/student',
     },
@@ -36,7 +58,6 @@ export const environment = {
         add2Pricing:'add2Pricing',
         addSod_Eod_List:"addListOfSodEod"
     }, 
-        
     backend_get_endpoints:{
       getEstimates:"getEstimates",
       getPriceTracing:"getPriceTracing",
@@ -48,25 +69,24 @@ export const environment = {
     }
     
 };
+ 
+export const metrics = {
+  monitoring: {
+    server: 'https://192.168.0.140:8183', // 🔧 Replace with process.env or override during deployment
+    frontendConsoleEndpoint: '/frontend-console-log',
+    frontendErrorEndpoint: '/frontend-error',
+    frontendMetricsEndpoint: '/frontend-metrics',
+    frontendConsolePath: '/frontend-console-log',
+    frontendErrorPath: '/frontend-error',
+    frontendMetricsPath: '/frontend-metrics',
+    frontendConsoleUrl: '/frontend-console-log',
+  },
+  frontEndFullUrl: {
+    frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
+    frontendErrorUrl: 'https://192.168.0.140:8183f/rontend-error',
+    frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics',
+ 
 
-export const metrics ={
+  }
+};
 
-    imagePath:"/upload",
-    genearate_tempkey:"/images/temp-key",
-    monitoring: {
-        server: 'https://192.168.0.140:8183',
-        frontendConsoleEndpoint: '/frontend-console-log',
-        frontendErrorEndpoint: '/frontend-error',
-        frontendMetricsEndpoint: '/frontend-metrics',
-        frontendConsolePath: '/frontend-console-log',
-        frontendErrorPath: '/frontend-error',
-        frontendMetricsPath: '/frontend-metrics'
-    },
-    frontEndFullUrl: {
-        
-        frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
-        frontendErrorUrl: 'https://192.168.0.140:8183/frontend-error',
-        frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics'
-
-    }
-}

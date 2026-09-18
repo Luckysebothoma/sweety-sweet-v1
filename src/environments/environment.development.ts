@@ -13,11 +13,27 @@ export const environment = {
         clientId: '5NZZICITa9LCg8U0dNQraVhGqNiEpUTi',
         audience:'https://linux.justdo-it.local:8083'
     },
-
+ 
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-            local_images:"https://192.168.0.140:3007/local_images"
+            local_images:"https://192.168.0.140:3007",
+            nginx:"https://192.168.0.140:3007",
+            hono:"https://192.168.0.140:3009/images",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+
+    },
+    expose_gif_failures:{
+            cross:"https://192.168.0.140:3007/failures/failure_cross.gif",
+            shake:"https://192.168.0.140:3007/failures/failure_shake.gif",
+            sad:"https://192.168.0.140:3009/failures/failure_sad.gif",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+
+    },expose_gif_loading:{
+            gear:"https://192.168.0.140:3007/loading/loading_gear.gif",
+            infinite:"https://192.168.0.140:3007/loading/loading_infinite.gif",
+            maze:"https://192.168.0.140:3009/loading/loading_maze.gif",
+            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
 
     },cloudflare_proxy:{
       webp:"https://192.168.0.140:3007/webp",
@@ -66,9 +82,9 @@ export const metrics = {
     frontendConsoleUrl: '/frontend-console-log',
   },
   frontEndFullUrl: {
-    frontendConsoleUrl: 'https://192.168.0.140:8183frontend-console-log',
-    frontendErrorUrl: 'https://192.168.0.140:8183frontend-error',
-    frontendMetricsUrl: 'https://192.168.0.140:8183frontend-metrics',
+    frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
+    frontendErrorUrl: 'https://192.168.0.140:8183f/rontend-error',
+    frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics',
  
 
   }

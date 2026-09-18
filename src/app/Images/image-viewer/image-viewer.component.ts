@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { ProductService } from 'src/app/product/product.service';
-import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { ImageService } from '../image.service';
  
 @Component({
@@ -16,10 +15,7 @@ constructor(
     public imageService: ImageService, 
     private productService:ProductService, 
     private http: HttpClient, 
-    private sanitizer: DomSanitizer,
    ){
-
-
 }
     ngOnInit(): void {
     const imageKey = 'productList'; // 🔑 Your Redis/image key
@@ -27,7 +23,7 @@ constructor(
     this.imageService.getImageByKey(imageKey).subscribe({
       next: (blob: Blob) => {
         const objectUrl = URL.createObjectURL(blob);
-        this.imageService.imageSrc = this.sanitizer.bypassSecurityTrustUrl(objectUrl);
+        this.imageService.imageSrc = objectUrl;
       },
       error: (err) => {
         console.error('❌ Failed to load image:', err);
