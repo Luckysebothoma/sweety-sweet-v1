@@ -26,6 +26,17 @@ import { DataArrayTransformerService } from '../Services/data-array-transformer.
  * "FIX #n" comments refer to the numbered list in the review notes.
  */
 
+/** Thrown when the HTTP call itself was 2xx but the API body says the operation failed. */
+export class ApiError extends Error {
+  constructor(message: string, public response?: any) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/** ISO-8601 timestamp as produced by JSON.stringify(Date), e.g. 2026-09-19T11:34:15.994Z */
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
+
 @Injectable({
   providedIn: 'root'
 })
@@ -46,6 +57,130 @@ export class ProductService {
   // URLs from whatever value happened to be left in it.
   private url(p: string): string {
     return this.apiUrl + p;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  API BOUNDARY  (FIX #33 / #34)
+  //  Everything that leaves or enters the service goes through here.
+  // ═══════════════════════════════════════════════════════════════════
+
+  /** Log every API call (request body + response) to the console. Errors are always logged. */
+  private readonly apiLogging = true;
+  /**
+   * How Date objects are written for MySQL DATETIME columns:
+   *  'local' -> the wall-clock time the user sees (Johannesburg 13:34 is stored as 13:34)
+   *  'utc'   -> UTC (13:34 SAST is stored as 11:34)
+   * Pick ONE and keep the server / other clients consistent.
+   */
+  private readonly DB_TIMEZONE: 'local' | 'utc' = 'local';
+
+  /** Date -> 'YYYY-MM-DD HH:mm:ss' (the only datetime shape MySQL strict mode accepts). */
+  toSqlDateTime(d: Date): string {
+    const utc = this.DB_TIMEZONE === 'utc';
+    const pad = (n: number, w = 2) => String(n).padStart(w, '0');
+    const y = utc ? d.getUTCFullYear() : d.getFullYear();
+    const mo = (utc ? d.getUTCMonth() : d.getMonth()) + 1;
+    const da = utc ? d.getUTCDate() : d.getDate();
+    const h = utc ? d.getUTCHours() : d.getHours();
+    const mi = utc ? d.getUTCMinutes() : d.getMinutes();
+    const se = utc ? d.getUTCSeconds() : d.getSeconds();
+    return `${pad(y, 4)}-${pad(mo)}-${pad(da)} ${pad(h)}:${pad(mi)}:${pad(se)}`;
+  }
+
+  /**
+   * Deep-copies a request body and makes it safe for the API/MySQL:
+   *  - Date objects AND ISO strings ('...T...Z')  -> 'YYYY-MM-DD HH:mm:ss'
+   *  - NaN / Infinity / Invalid Date              -> throws with the exact path (instead of silently becoming null)
+   *  - FormData / Blob / ArrayBuffer              -> passed through untouched
+   */
+  private clean<T>(value: T, label = 'body'): T {
+    const walk = (v: any, path: string): any => {
+      if (v === null || v === undefined) return v;
+      if (v instanceof Date) {
+        if (isNaN(v.getTime())) throw new Error(`Invalid Date at ${label}.${path}`);
+        return this.toSqlDateTime(v);
+      }
+      if (typeof v === 'number') {
+        if (!Number.isFinite(v)) throw new Error(`Invalid number (${v}) at ${label}.${path}`);
+        return v;
+      }
+      if (typeof v === 'string') {
+        if (ISO_TIMESTAMP.test(v)) {
+          const d = new Date(v);
+          if (!isNaN(d.getTime())) return this.toSqlDateTime(d);
+        }
+        return v;
+      }
+      if ((typeof FormData !== 'undefined' && v instanceof FormData) ||
+          (typeof Blob !== 'undefined' && v instanceof Blob) ||
+          v instanceof ArrayBuffer) return v;
+      if (Array.isArray(v)) return v.map((x, i) => walk(x, `${path}[${i}]`));
+      if (typeof v === 'object') {
+        const o: any = {};
+        for (const k of Object.keys(v)) o[k] = walk(v[k], path ? `${path}.${k}` : k);
+        return o;
+      }
+      return v;
+    };
+    return walk(value, '') as T;
+  }
+
+  /** True when a 2xx response body says the operation actually failed. */
+  private isApiFailure(res: any): boolean {
+    if (!res || typeof res !== 'object' || Array.isArray(res)) return false;
+    if (typeof res.type === 'number') return false; // HttpEvent (upload progress etc.)
+    if (res.success === false || res.ok === false) return true;
+    if (typeof res.status === 'string' && /^(error|fail|failed)$/i.test(res.status)) return true;
+    if (res.sqlMessage || (typeof res.code === 'string' && /^ER_/.test(res.code))) return true;
+    if (res.error) return true;
+    if (res.success !== true && typeof res.message === 'string' && /^\s*❌/.test(res.message)) return true;
+    return false;
+  }
+
+  /**
+   * Pipe operator: turns "HTTP 200 but success:false" into a real error, and logs request + response.
+   * Before, the client only looked at the HTTP status, so a rolled-back INSERT still counted as success.
+   */
+  private check<T>(label: string, sent?: any): (source: Observable<T>) => Observable<T> {
+    return (source: Observable<T>) => source.pipe(
+      map(res => {
+        if (this.isApiFailure(res)) {
+          const message = this.msg(res);
+          console.error(`[API] ${label} ✗ HTTP OK but the API reported a failure`, { sent, response: res });
+          throw new ApiError(message, res);
+        }
+        if (this.apiLogging) console.info(`[API] ${label} ✓`, { sent, response: res });
+        return res;
+      }),
+      catchError(err => {
+        if (err?.name !== 'ApiError') {
+          console.error(`[API] ${label} ✗ HTTP error ${err?.status ?? ''}`, { sent, serverResponse: err?.error ?? err });
+        }
+        return throwError(() => err);
+      })
+    );
+  }
+
+  private post<T = any>(path: string, body: any): Observable<T> {
+    return defer(() => {
+      const c = this.clean(body, path);
+      return this.http.post<T>(this.url(path), c).pipe(this.check<T>(`POST ${path}`, c));
+    });
+  }
+
+  private put<T = any>(path: string, body: any): Observable<T> {
+    return defer(() => {
+      const c = this.clean(body, path);
+      return this.http.put<T>(this.url(path), c).pipe(this.check<T>(`PUT ${path}`, c));
+    });
+  }
+
+  private get<T = any>(path: string): Observable<T> {
+    return defer(() => this.http.get<T>(this.url(path)).pipe(this.check<T>(`GET ${path}`)));
+  }
+
+  private del<T = any>(path: string, options?: any): Observable<T> {
+    return defer(() => (this.http.delete<T>(this.url(path), options) as Observable<T>).pipe(this.check<T>(`DELETE ${path}`)));
   }
 
   private dbg(...args: any[]): void {
@@ -195,8 +330,14 @@ export class ProductService {
   /** Turn anything (string, Error, HttpErrorResponse, object) into readable text for the snackbar. */
   private msg(m: any): string {
     if (typeof m === 'string') return m;
+    // HttpErrorResponse: prefer what the SERVER said over Angular's generic "Http failure response for ..."
+    if (typeof m?.error === 'string' && m.error) return m.error;
     if (m?.error?.message) return String(m.error.message);
+    if (m?.error?.sqlMessage) return String(m.error.sqlMessage);
+    if (typeof m?.error?.error === 'string') return m.error.error;
+    if (m?.sqlMessage) return String(m.sqlMessage);
     if (m?.message) return String(m.message);
+    if (typeof m?.error === 'string') return m.error;
     try { return JSON.stringify(m); } catch { return String(m); }
   }
 
@@ -321,7 +462,7 @@ export class ProductService {
     if (dup) return throwError(() => new Error(dup));
 
     const body = { addProductListRequest, addProductPricingRequest, addAvailableItemsRequest, addPriceTracing };
-    return this.http.post(this.url('addNewCandy'), body);
+    return this.post('addNewCandy', body);
   }
 
   /**
@@ -339,11 +480,11 @@ export class ProductService {
     const dup = this.findDuplicateProduct(addProductListRequest);
     if (dup) return throwError(() => new Error(dup));
 
-    formData.set('addProductListRequest', JSON.stringify(addProductListRequest));
-    formData.set('addProductPricingRequest', JSON.stringify(addProductPricingRequest));
-    formData.set('addAvailableItemsRequest', JSON.stringify(addAvailableItemsRequest));
-    formData.set('addPriceTracing', JSON.stringify(addPriceTracing));
-    return this.http.post(this.url('addNewCandy_with_image'), formData);
+    formData.set('addProductListRequest', JSON.stringify(this.clean(addProductListRequest, 'addProductListRequest')));
+    formData.set('addProductPricingRequest', JSON.stringify(this.clean(addProductPricingRequest, 'addProductPricingRequest')));
+    formData.set('addAvailableItemsRequest', JSON.stringify(this.clean(addAvailableItemsRequest, 'addAvailableItemsRequest')));
+    formData.set('addPriceTracing', JSON.stringify(this.clean(addPriceTracing, 'addPriceTracing')));
+    return this.post('addNewCandy_with_image', formData);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1138,7 +1279,11 @@ export class ProductService {
       };
 
       requests.push(
-        this.httpClientService.post<any>('addListOfSodEod', body, 'addListOfSodEod').pipe(
+        defer(() => {
+          const c = this.clean(body, 'addListOfSodEod');
+          return this.httpClientService.post<any>('addListOfSodEod', c, 'addListOfSodEod')
+            .pipe(this.check<any>('POST addListOfSodEod', c));
+        }).pipe(
           map(() => ({ productId, ok: true })),
           catchError(err => {
             problems.push(`${label}: ${this.msg(err)}`);
@@ -1338,7 +1483,7 @@ export class ProductService {
 
   /** Observable version – prefer this. */
   deleteAllProductData$(productId: number): Observable<ApiResponse<any>> {
-    return this.httpClientService.delete<ApiResponse<any>>('deleteAllProductData', productId, 'deleteAllProductData');
+    return this.httpClientService.delete<ApiResponse<any>>('deleteAllProductData', productId, 'deleteAllProductData').pipe(this.check<ApiResponse<any>>('DELETE deleteAllProductData'));
   }
 
   /** Old Tracer-style API. The returned object is filled in when the response arrives. */
@@ -1395,43 +1540,43 @@ export class ProductService {
   }
 
   deleteData(productId: number): Observable<any> {
-    return this.http.delete<any>(this.url('deleteProductbyId'), { body: { productId } });
+    return this.del<any>('deleteProductbyId', { body: { productId } });
   }
 
   removeStockItemsS(id: number): Observable<any> {
-    return this.http.delete<any>(this.url('removeStockedItems/' + id));
+    return this.del<any>('removeStockedItems/' + id);
   }
 
   removeStockedItems(id: number): Observable<any> {
     if (!id) throw new Error('Invalid id provided to removeStockedItems');
-    return this.httpClientService.delete<StockedItems>('removeStockedItems', id, 'removeStockedItems');
+    return this.httpClientService.delete<StockedItems>('removeStockedItems', id, 'removeStockedItems').pipe(this.check<any>('DELETE ' + 'removeStockedItems'));
   }
 
   removeProductItemPricing(id: number): Observable<any> {
     if (!id) throw new Error('Invalid id provided to removeProductItemPricing');
-    return this.httpClientService.delete<ProductItemPricing>('removeProductItemPricing', id, 'removeProductItemPricing');
+    return this.httpClientService.delete<ProductItemPricing>('removeProductItemPricing', id, 'removeProductItemPricing').pipe(this.check<any>('DELETE ' + 'removeProductItemPricing'));
   }
 
   removePriceTracing(id: number): Observable<any> {
     if (!id) throw new Error('Invalid id provided to removePriceTracing');
-    return this.http.delete<any>(this.url('removePriceTracing/' + id));
+    return this.del<any>('removePriceTracing/' + id);
   }
 
   removeProductList(id: number): Observable<any> {
-    return this.httpClientService.delete<ProductList>('deleteProduct', id, 'deleteProduct');
+    return this.httpClientService.delete<ProductList>('deleteProduct', id, 'deleteProduct').pipe(this.check<any>('DELETE ' + 'deleteProduct'));
   }
 
   removeEstimateById(id: number): Observable<any> {
-    return this.httpClientService.delete<EstimatedPricing>('removeEstimateById', id, 'removeEstimateById');
+    return this.httpClientService.delete<EstimatedPricing>('removeEstimateById', id, 'removeEstimateById').pipe(this.check<any>('DELETE ' + 'removeEstimateById'));
   }
 
   removeAvailableItemsById(id: number): Observable<any> {
-    return this.httpClientService.delete<AvailableItems>('removeAvailableItemsById', id, 'removeAvailableItemsById');
+    return this.httpClientService.delete<AvailableItems>('removeAvailableItemsById', id, 'removeAvailableItemsById').pipe(this.check<any>('DELETE ' + 'removeAvailableItemsById'));
   }
 
   removeSodEodById(id: number): Observable<any> {
     if (!id) throw new Error('Invalid id provided to removeSodEodById');
-    return this.httpClientService.delete<SOD_EOD>('removeSodEodById', id, 'removeSodEodById');
+    return this.httpClientService.delete<SOD_EOD>('removeSodEodById', id, 'removeSodEodById').pipe(this.check<any>('DELETE ' + 'removeSodEodById'));
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1439,15 +1584,15 @@ export class ProductService {
   // ═══════════════════════════════════════════════════════════════════
 
   updateProductPricing(_api: string, pricing: productPricing): Observable<void[]> {
-    return this.http.put<void[]>(this.url('updateProductPricing'), pricing);
+    return this.put<void[]>('updateProductPricing', pricing);
   }
 
   updateProductItemPricing(productItemPricing: ProductItemPricing): Observable<void[]> {
-    return this.http.put<void[]>(this.url('updateProductItemPricing'), productItemPricing);
+    return this.put<void[]>('updateProductItemPricing', productItemPricing);
   }
 
   updateYummyList(productPricing: ProductPricing): Observable<ProductPricing> {
-    return this.http.put<ProductPricing>(this.url('updatePricingList'), productPricing);
+    return this.put<ProductPricing>('updatePricingList', productPricing);
   }
 
   httpCall_UpdateYUmmyList(yummyList: YummyList): void {
@@ -1500,23 +1645,23 @@ export class ProductService {
   }
 
   updateSodEod(productList: SOD_EOD): Observable<void[]> {
-    return this.http.put<void[]>(this.url('updateSodEodItems'), productList);
+    return this.put<void[]>('updateSodEodItems', productList);
   }
 
   updateProductListByID(_api: string, productList: ProductList): Observable<void[]> {
-    return this.http.put<void[]>(this.url('updateProductList'), productList);
+    return this.put<void[]>('updateProductList', productList);
   }
 
   updatePriceTracing(_priceTracing: PriceTracing): Observable<void[]> {
-    return this.http.put<void[]>(this.url('updatePriceTracing'), _priceTracing);
+    return this.put<void[]>('updatePriceTracing', _priceTracing);
   }
 
   updateAvailableItems(availableItems: AvailableItems): Observable<any> {
-    return this.http.put<any>(this.url('updateAvailableItems'), availableItems);
+    return this.put<any>('updateAvailableItems', availableItems);
   }
 
   updateEstimates(_estimates: EstimatedPricing): Observable<void> {
-    return this.http.put<void>(this.url('updateEstimates'), _estimates);
+    return this.put<void>('updateEstimates', _estimates);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1524,23 +1669,23 @@ export class ProductService {
   // ═══════════════════════════════════════════════════════════════════
 
   getProductItemPricing_HTTP(): Observable<ApiResponse<ProductItemPricing[]>> {
-    return this.http.get<ApiResponse<ProductItemPricing[]>>(this.url('getProductItemPricing'));
+    return this.get<ApiResponse<ProductItemPricing[]>>('getProductItemPricing');
   }
 
   valid(validate: Login): Observable<void[]> {
-    return this.http.post<void[]>(this.url(api.validateUser), validate);
+    return this.post<void[]>(api.validateUser, validate);
   }
 
   addProducts(product: ProductList): Observable<ProductList> {
-    return this.http.post<ProductList>(this.url('addProduct'), product);
+    return this.post<ProductList>('addProduct', product);
   }
 
   addProductItemPricing_HTTP(product: ProductItemPricing): Observable<ProductItemPricing> {
-    return this.http.post<ProductItemPricing>(this.url('addProductItemPricing'), product);
+    return this.post<ProductItemPricing>('addProductItemPricing', product);
   }
 
   getProductList(): Observable<ApiResponse<ProductList[]>> {
-    return this.httpClientService.get<ApiResponse<ProductList[]>>('getProductList', {}, 'productList');
+    return this.httpClientService.get<ApiResponse<ProductList[]>>('getProductList', {}, 'productList').pipe(this.check<ApiResponse<ProductList[]>>('GET getProductList'));
   }
 
   getArrayFromResponse<T>(response: ApiResponse<T[]>): T[] {
@@ -1548,7 +1693,7 @@ export class ProductService {
   }
 
   getProductPricing(): Observable<ApiResponse<ProductPricing[]>> {
-    return this.httpClientService.get<ApiResponse<ProductPricing[]>>('/getallpricing', {}, 'productPricing');
+    return this.httpClientService.get<ApiResponse<ProductPricing[]>>('/getallpricing', {}, 'productPricing').pipe(this.check<ApiResponse<ProductPricing[]>>('GET getallpricing'));
   }
 
   // FIX #29: built `${apiUrl}/getProductPricing` (double slash AND a route that doesn't exist – the route is getallpricing)
@@ -1558,55 +1703,55 @@ export class ProductService {
 
   // FIX #29b: posted to the bare base URL instead of .../add2Pricing
   addYummies(productPricing: productPricing): Observable<void[]> {
-    return this.http.post<void[]>(this.url('add2Pricing'), productPricing);
+    return this.post<void[]>('add2Pricing', productPricing);
   }
 
   addSodEod(sodEodList: SOD_EOD): Observable<void[]> {
-    return this.http.post<void[]>(this.url('addSodEodItems'), sodEodList);
+    return this.post<void[]>('addSodEodItems', sodEodList);
   }
 
   getSodEod(_api: string): Observable<ApiResponse<SOD_EOD[]>> {
-    return this.http.get<ApiResponse<SOD_EOD[]>>(this.url('getSodEodItems'));
+    return this.get<ApiResponse<SOD_EOD[]>>('getSodEodItems');
   }
 
   getSodEodList(): Observable<MatTableSOD_EOD[]> {
-    return this.http.get<MatTableSOD_EOD[]>(this.url('getSodEodList'));
+    return this.get<MatTableSOD_EOD[]>('getSodEodList');
   }
 
   addStock(_stockitems: StockItems): Observable<void[]> {
-    return this.http.post<void[]>(this.url('addStock'), _stockitems);
+    return this.post<void[]>('addStock', _stockitems);
   }
 
   addStockedItems_HTTP(_stockitems: StockedItems): Observable<any> {
-    return this.http.post<any>(this.url('addStockedItems'), _stockitems);
+    return this.post<any>('addStockedItems', _stockitems);
   }
 
   getStockList(): Observable<ApiResponse<StockItems[]>> {
-    return this.http.get<ApiResponse<StockItems[]>>(this.url('getallStock'));
+    return this.get<ApiResponse<StockItems[]>>('getallStock');
   }
 
   addAvailableItems(availableItems: AvailableItems): Observable<void> {
-    return this.http.post<void>(this.url('addAvailableItems'), availableItems);
+    return this.post<void>('addAvailableItems', availableItems);
   }
 
   getAvailableItems(): Observable<ApiResponse<AvailableItems[]>> {
-    return this.http.get<ApiResponse<AvailableItems[]>>(this.url('getallAvailableItems'));
+    return this.get<ApiResponse<AvailableItems[]>>('getallAvailableItems');
   }
 
   getPriceTracing(): Observable<ApiResponse<PriceTracing[]>> {
-    return this.http.get<ApiResponse<PriceTracing[]>>(this.url('getPriceTracing'));
+    return this.get<ApiResponse<PriceTracing[]>>('getPriceTracing');
   }
 
   addPriceTracing(_priceTracing: PriceTracing): Observable<void> {
-    return this.http.post<void>(this.url('addPriceTracing'), _priceTracing);
+    return this.post<void>('addPriceTracing', _priceTracing);
   }
 
   getEstimates(): Observable<ApiResponse<EstimatedPricing[]>> {
-    return this.http.get<ApiResponse<EstimatedPricing[]>>(this.url('getEstimates'));
+    return this.get<ApiResponse<EstimatedPricing[]>>('getEstimates');
   }
 
   addEstimates(_estimates: EstimatedPricing): Observable<void> {
-    return this.http.post<void>(this.url('addEstimates'), _estimates);
+    return this.post<void>('addEstimates', _estimates);
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1634,7 +1779,7 @@ export class ProductService {
   }
 
   getImages(): Observable<any[]> {
-    return this.http.get<any[]>(this.url('getImages'));
+    return this.get<any[]>('getImages');
   }
 
   getImagesById(id: number): Observable<Blob> {

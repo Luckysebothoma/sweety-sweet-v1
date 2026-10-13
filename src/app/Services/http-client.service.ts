@@ -18,9 +18,7 @@ export class HttpClientService {
 
 
   apiUrl = environment.redisPostgres;
-  private readonly API_URL = environment.apiUrl +"/images/temp";
-  private nodejs_apiUrl = 'http://localhost:8080/api/stock/process'; // or your public tunnel URL
-  
+  private readonly API_URL = environment.apiUrl +"/images/temp";  
 
   constructor(private http : HttpClient) { }
 
@@ -49,7 +47,7 @@ export class HttpClientService {
 
 
 async sendImageToEndpoint(productId: number): Promise<void> {
-  const imageUrl = `https://expose_images.justdo-it.uk/images/Product_${productId}.jpg`;
+  const imageUrl = environment.expose_image.local_images + `/Product_${productId}.jpg`;
   console.log(`📤 Attempting to send image for productId=${productId} from URL: ${imageUrl}`);
 
   try {
