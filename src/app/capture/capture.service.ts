@@ -1,7 +1,7 @@
 import { Injectable, OnInit, ViewChild } from '@angular/core';
 import { ButtonOptions, CandyList, YummyList, api, ProductPricing, StockItems, AvailableItems, SOD_EOD, ImagesToPrev, NewProductList } from '../models/candy-list';
 import { ProductService } from '../product/product.service';
-import { forkJoin, Observable } from 'rxjs';
+import { BehaviorSubject, Subject, forkJoin, Observable } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableDataSource } from '@angular/material/table';
 import { ProductList, productPricing } from './capture-view/models/candy-list';
@@ -12,6 +12,9 @@ import { ImageUploadService } from '../Images/image-upload/image-upload.service'
 import { ImageService } from '../Images/image.service';
 import { AuthService } from '@auth0/auth0-angular';
 import { DateTimeService } from '../Services/date-time.service';
+import { from } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+import { buildProductImageName, toWebpBlob } from '../Images/image-utils';
   
 @Injectable({
   providedIn: 'root'
@@ -740,6 +743,29 @@ deleteCandy(id: number): void {
   }
  
 
+/** File chosen in the Add New stepper; uploaded only after the product itself is saved. */
+pendingImage: File | null = null;
+addProductInFlight = false;
+
+/**
+ * Converts the chosen image to WebP (so bytes match the ".webp" name) and uploads it.
+ * Failures are reported to the user; the product itself is already saved at this point.
+ */
+uploadProductImageFile(file: File | null, fileName: string): void {
+  if (!file) return;
+  from(toWebpBlob(file)).pipe(
+    switchMap(blob => this.imageService.uploadProductImage(blob, fileName))
+  ).subscribe({
+    next: () => this.productService.showSuccess(' Image uploaded '),
+    error: (err) => {
+      console.error('Image upload failed', err);
+      this.productService.showError(
+        'Product was saved, but its image failed to upload (' + (err?.message ?? err) + '). Re-add the image from the Edit tab.'
+      );
+    }
+  });
+}
+
 submitForm():void{  
   
   // update Mat-table
@@ -757,8 +783,8 @@ submitForm():void{
         productFlavor: group.productFlavor,
         productPrice: parseFloat(group.productPrice),
         productQuantity: parseInt(group.productQuantity),
-        productSize: parseInt(group.productQuantity),
-        image_url: `${group.productName} ${group.productFlavor}.webp`,
+        productSize: parseFloat(group.productSize), // was parseInt(group.productQuantity): size was silently overwritten by quantity
+        image_url: buildProductImageName(group.productName, group.productFlavor),
         itemGrouping: ''
       };
         console.log(this.dateTimeService.formatPartial(Date.now()) + ":  "+this.dateTimeService.formatPartial(Date.now()) + ":  Submitting New Product Form:" + JSON.stringify(productData))
@@ -836,21 +862,15 @@ submitForm():void{
 
             }
 
-            // Prepare FormData for image upload and product details
-            const formData = new FormData();
+            // Image chosen in the Add New stepper (null when the user skipped it)
+            const imageFile: File | null = this.pendingImage;
 
-            // Append all selected files to FormData
-            if (this.productService.selectedFiles && this.productService.selectedFiles.length > 0) {
-              for (let i = 0; i < this.productService.selectedFiles.length; i++) {
-               const file = this.productService.selectedFiles[i];
-                console.log(file, 'name: ' + file.name);
-                formData.append('image', file, file.name); // ✅ correct name and filename
-
-              }
-
+            // Block double-submit while the previous save is still in flight
+            if (this.addProductInFlight) {
+              this.productService.showError('Still saving the previous product, please wait.');
+              return;
             }
-            // You can now send formData to your backend using an HTTP request if needed
-          
+            this.addProductInFlight = true;
             const loadMessage = "Busy"
 
             
@@ -865,11 +885,10 @@ submitForm():void{
  
               response => {
                       this.matTableService.resetForm();
-                this.productService.uploadImage(formData).subscribe(
-                  res=>{
-                    console.log("done uploading image")
-                  }
-                )
+                this.addProductInFlight = false;
+                this.pendingImage = null;
+                this.imageService.rememberProduct(productToAdd as any);
+                this.uploadProductImageFile(imageFile, productToAdd.image_url);
                 
                // this.httpClientService.uploadTempImage()
                // this.productService.uploadImages();
@@ -884,6 +903,7 @@ submitForm():void{
                 this.productService.hideLoading();
                 this.productService.showSuccess(successMessage);
               }, error => {
+                this.addProductInFlight = false;
             
                 const errorMessage = " Failed to Added " +
                 "Available Items "+ 
@@ -1025,11 +1045,49 @@ createYummyList(_productPricing: any[], _productList: ProductList[]): void {
 
 }
 
-makeProductChanges(form:any): void {
+/** Row currently opened in the Edit form (snapshot taken by editCandy). */
+editingRow: YummyList | null = null;
+/** Emits the selected product id (or null when the Edit form is closed). */
+readonly editSelected$ = new BehaviorSubject<number | null>(null);
+/** Emits after a product was saved from the Edit form so tables can reload. */
+readonly productEdited$ = new Subject<void>();
 
-  console.log(this.dateTimeService.formatPartial(Date.now()) + ":  "+this.dateTimeService.formatPartial(Date.now()) + ":  Changes to make on Product: " + JSON.stringify(form))
+/**
+ * Saves the Edit form through the shared, validated update path and, only after the
+ * server confirmed the update, uploads the replacement image (if one was chosen).
+ */
+makeProductChanges(form: any, imageFile: File | null = null): void {
+  const base = this.editingRow;
+  if (!base) {
+    this.productService.showError('Select a product from the table first.');
+    return;
+  }
+  const num = (v: any, fallback: number) =>
+    (v === null || v === undefined || v === '' || isNaN(Number(v))) ? fallback : Number(v);
 
+  const merged: YummyList = {
+    ...base,
+    productName: String(form.name ?? base.productName).trim(),
+    productFlavor: String(form.flavor ?? base.productFlavor).trim(),
+    productQuantity: num(form.quantity, base.productQuantity),
+    productSize: num(form.size, base.productSize),
+    productPrice: num(form.CostPrice, base.productPrice),
+    sellingPrice: num(form.sellingPrice, base.sellingPrice),
+    itemGrouping: num(form.itemGroup, base.itemGrouping)
+  };
+  const fileName = buildProductImageName(merged.productName, merged.productFlavor);
 
+  this.productService.submitProductEdit$(merged).subscribe(saved => {
+    if (!saved) return;
+    this.imageService.rememberProduct({
+      productId: merged.productId, productName: merged.productName,
+      productFlavor: merged.productFlavor, productPrice: merged.productPrice, image_url: fileName
+    });
+    this.uploadProductImageFile(imageFile, fileName);
+    this.editingRow = null;
+    this.editSelected$.next(null);
+    this.productEdited$.next();
+  });
 }
 
 editCandy(yummyList: YummyList){
@@ -1049,14 +1107,9 @@ console.log(this.dateTimeService.formatDate(Date.now()) + "Sending dat t o be ed
   this.newSize= yummyList.productSize;
   this.newSellingPrice= yummyList.sellingPrice
 
-  // Add Product List Prev 
-
-    this.imageService.imageKeys.splice(0);
-    let prodId:ImagesToPrev ={
-      productId: undefined
-    }
-    this.imageService.imageKeys.push(this.newID);
-    this.imageService.getRedisProductImage(this.newID)
+  this.newItemGroup = yummyList.itemGrouping ?? 0;
+  this.editingRow = { ...yummyList };
+  this.editSelected$.next(yummyList.productId);
   
 
 

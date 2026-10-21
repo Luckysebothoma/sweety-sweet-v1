@@ -1,45 +1,72 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { CaptureService } from '../capture.service';
- import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
+/**
+ * Detail editor for ONE product, opened from the Edit table's "Details & image" button
+ * (CaptureService.editCandy -> editSelected$). Saving goes through
+ * CaptureService.makeProductChanges, which uses the same validated update path as the
+ * table's inline edit and uploads the replacement image only after the update succeeded.
+ */
 @Component({
   selector: 'app-edit-existing',
   standalone: false,
   templateUrl: './edit-existing.component.html',
   styleUrl: './edit-existing.component.css'
 })
-export class EditExistingComponent implements OnInit{
+export class EditExistingComponent implements OnInit, OnDestroy {
 
   editForm!: FormGroup;
+  selectedId: number | null = null;
+  imageFile: File | null = null;
+  private sub?: Subscription;
 
-  constructor(public captureServie: CaptureService,
-     private fb: FormBuilder
-  ){}
+  constructor(public captureServie: CaptureService, private fb: FormBuilder) {}
 
   ngOnInit(): void {
-
     this.editForm = this.fb.group({
-      id: [{ value: this.captureServie.newID, disabled: true }, Validators.required],
-      name: [this.captureServie.newName, Validators.required],
-      flavor: [this.captureServie.newFlavor],
-      quantity: [this.captureServie.newQuantity],
-      size: [this.captureServie.newSize],
-      CostPrice: [this.captureServie.newPrice],
-      sellingPrice: [this.captureServie.newSellingPrice],
-      itemGroup: [this.captureServie.newItemGroup]
+      id: [{ value: null, disabled: true }, Validators.required],
+      name: ['', Validators.required],
+      flavor: ['', Validators.required],
+      quantity: [null, [Validators.required, Validators.min(0)]],
+      size: [null],
+      CostPrice: [null, [Validators.required, Validators.min(0)]],
+      sellingPrice: [null],
+      itemGroup: [null]
     });
-    
-
-    // Example - measure page load time
-    const loadTime = window.performance.now();
-   }
-
-  applyChanges() {
-    if (this.editForm.valid) {
-      const formData = this.editForm.getRawValue();
-
-      this.captureServie.makeProductChanges(formData); // Send the updated data to service
-    }
+    this.sub = this.captureServie.editSelected$.subscribe(id => this.load(id));
   }
 
+  ngOnDestroy(): void {
+    this.sub?.unsubscribe();
+  }
+
+  private load(id: number | null): void {
+    this.selectedId = id;
+    this.imageFile = null;
+    if (id === null) return;
+    const s = this.captureServie;
+    this.editForm.reset({
+      id: s.newID, name: s.newName, flavor: s.newFlavor, quantity: s.newQuantity,
+      size: s.newSize, CostPrice: s.newPrice, sellingPrice: s.newSellingPrice, itemGroup: s.newItemGroup
+    });
+  }
+
+  onImageSelected(file: File | null): void {
+    this.imageFile = file;
+  }
+
+  applyChanges(): void {
+    if (this.selectedId === null) return;
+    if (this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+    this.captureServie.makeProductChanges(this.editForm.getRawValue(), this.imageFile);
+  }
+
+  close(): void {
+    this.captureServie.editSelected$.next(null);
+  }
 }

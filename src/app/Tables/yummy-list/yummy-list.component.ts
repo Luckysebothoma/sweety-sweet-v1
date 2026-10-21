@@ -10,6 +10,9 @@ import { ProductService } from 'src/app/product/product.service';
 import { HttpClientService } from 'src/app/Services/http-client.service';
 import { LoggerRequestService } from 'src/app/Services/logger-request.service';
 import { ValidatorService } from 'src/app/Services/validator.service';
+import { buildProductImageName } from 'src/app/Images/image-utils';
+import { Observable } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 
 @Component({
@@ -39,7 +42,10 @@ export class YummyListTableComponent implements AfterViewInit {
     public captureService: CaptureService,
     public imageService: ImageService, public loggerRequestService:LoggerRequestService, 
     public httpClientService:HttpClientService, private ValidatorService: ValidatorService
-  ) {}
+  ) {
+    // reload after a product was saved from the Edit form
+    this.captureService.productEdited$.pipe(takeUntilDestroyed()).subscribe(() => this.loadTableData());
+  }
 
   ngAfterViewInit(): void {
     this.dataSourceYummylist.paginator = this.paginator;
@@ -158,13 +164,26 @@ submitForm(): void {
 */
 
 
+/** Replacement image chosen while editing a row (uploaded after a successful save). */
+editImageFile: File | null = null;
+
+onEditImageSelected(file: File | null): void {
+  this.editImageFile = file;
+}
+
+openDetails(row: YummyList): void {
+  this.captureService.editCandy(row);
+}
+
 editRow(row: any, index: number): void {
+  this.editImageFile = null;
   this.editIndex = index;
   this.editedRow = { ...row }; // shallow copy for editing
 
 }
 
 cancelEdit(): void {
+  this.editImageFile = null;
   this.editIndex = null;
   this.editedRow = {};
 }
@@ -179,7 +198,7 @@ saveRow(item: YummyList, index: number): void {
     productName: this.editedRow.productName,
     productFlavor: this.editedRow.productFlavor,
     productPrice: this.editedRow.productPrice,
-    image_url: `${this.editedRow.productName} ${this.editedRow.productFlavor}_WebP.webp`
+    image_url: buildProductImageName(this.editedRow.productName, this.editedRow.productFlavor)
   };
 
   const productPricing: ProductPricing = {
@@ -189,7 +208,7 @@ saveRow(item: YummyList, index: number): void {
     productProfit: this.editedRow.productProfit,
     sellingPrice: this.editedRow.sellingPrice,
     productCommission: this.editedRow.productCommission,
-    itemGrouping: this.editedRow.itemGroup,
+    itemGrouping: this.editedRow.itemGrouping, // was itemGroup (undefined on a YummyList row): the group was lost on every inline edit
     productId: this.editedRow.productId
   };
 
@@ -198,11 +217,18 @@ saveRow(item: YummyList, index: number): void {
   console.log(`DOne preparing for new product SAVED ${JSON.stringify(item)} productList ${JSON.stringify(productList)}`);
 
   const updatedYummy = this.productService.createYummyList(productList, productPricing);
-  
-  this.saveYummyListRow(updatedYummy, index);
 
-  this.cancelEdit(); // clear edit mode
-  this.loadTableData();
+  // capture before cancelEdit() clears the edit state
+  const newImage = this.editImageFile;
+  const newImageName = productList.image_url;
+
+  this.cancelEdit(); // leave edit mode right away
+  this.saveYummyListRow(updatedYummy, index).subscribe(saved => {
+    if (!saved) return;
+    this.imageService.rememberProduct(productList);
+    this.captureService.uploadProductImageFile(newImage, newImageName);
+    this.loadTableData();
+  });
 }
 
 removeCandy(row:any, i:number){
@@ -221,80 +247,14 @@ onImageError(event: Event) {
   console.log(`onImageError Callback Image:  ${this.imageService.fallbackImage}`)
 
 }
-saveYummyListRow(yummyList: YummyList, index: number): void {
-  // Optionally validate the item before saving
-  if (
-    !yummyList.productName || !yummyList.productFlavor ||
-    !this.ValidatorService.isValidNumber(yummyList.productPrice) ||
-    !this.ValidatorService.isValidNumber(yummyList.productQuantity)
-  ) {
-    this.productService.showError("⚠️ Invalid data found in row.");
-    return;
-  }
-
+saveYummyListRow(yummyList: YummyList, index: number): Observable<boolean> {
   this.loggerRequestService.logEvent("edit_row_saved", {
     rowIndex: index,
-    productId: yummyList.productId,
-    productName: yummyList.productName
+    productId: yummyList?.productId,
+    productName: yummyList?.productName
   });
-
   this.editIndex = null;
-  
-  if (!yummyList) {
-    this.productService.showError("❌ No rows to submit.");
-    return;
-  }
-
-     // 🧾 Prepare data to submit
-  const productList: ProductList[] = [{
-    productId: yummyList.productId,
-    productName: yummyList.productName,
-    productFlavor: yummyList.productFlavor,
-    productPrice: yummyList.productPrice,
-    image_url: `${yummyList.productName} ${yummyList.productFlavor}_WebP.webp`
-  }];
-
-  const pricingList: ProductPricing[] = [{
-    productId: yummyList.productId,
-    productSize: yummyList.productSize,
-    productQuantity: yummyList.productQuantity,
-    sellingPrice: yummyList.sellingPrice,
-    productCommission: yummyList.productCommission,
-    productProfit: yummyList.productProfit,
-    costPerItem: yummyList.costPerItem,
-    itemGrouping: yummyList.itemGrouping
-  }];
-
-  const availableItems: AvailableItems[] = [this.productService.createAvailableItem(yummyList)];
-  const priceTracingList: PriceTracing[] = [this.productService.createPriceTracing(yummyList)];
-
-
-  this.loggerRequestService.logEvent("saveYummyListRow", {
-    productList,
-    pricingList,
-    availableItems,
-    priceTracingList, 
-    yummyList
- })
-
-
-
- let response:Tracer = this.productService.updateYummyListTable(productList, pricingList, availableItems, priceTracingList);
-
-
- console.log(`Updating YUmmy List response : ${JSON.stringify(response)}`)
- if(!response.status){
-  this.productService.showError(response.message)
-
- }else{
-this.productService.showSuccess(response.message)
- }
- 
-// this.productService.updateYummyList()
- 
-
-
- 
+  return this.productService.submitProductEdit$(yummyList);
 }
 
 }

@@ -1,31 +1,11 @@
-<div class="">
-  <h2>Image Gallery</h2>
-  <div *ngIf="imageService.imageKeys.length === 0" class="no-images">No images found.</div>
-  
-  <div class="" *ngIf="imageService.imageKeys.length > 0">
-    <div *ngFor="let key of imageService.imageKeys" class="">
-      <div class="">
-        <img 
-            [src]="imageService.imageUrl + '/Product_' + key + '.jpg'" 
-            [alt]="key" 
-            (error)="imageService.onImageError($event)" 
-            class=""
-            />
+<div class="edit-image-compare" style="display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap;">
+  <figure style="margin:0;">
+    <figcaption><strong>Current image</strong></figcaption>
+    <app-image-viewer [productId]="productId" alt="Current product image"></app-image-viewer>
+  </figure>
 
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="image-gallery">
-  <ng-container *ngIf="imageService.imagesToPrev.length > 0">
-    <div class="image-card" *ngFor="let productId of imageService.imagesToPrev">
-      <img
-        [src]="imageService.getImageUrl_nginx(productId)"
-        [alt]="'Product ' + productId"
-        (error)="imageService.onImageError($event, productId)"
-      />
-      <div class="caption">Product ID: {{ productId }}</div>
-    </div>
-  </ng-container>
+  <figure style="margin:0;" *ngIf="pendingUrl">
+    <figcaption><strong>New image (will upload on Apply)</strong></figcaption>
+    <img [src]="pendingUrl" alt="New product image preview" style="max-width:120px; max-height:120px;" />
+  </figure>
 </div>

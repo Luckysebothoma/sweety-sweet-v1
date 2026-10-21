@@ -1,35 +1,30 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
-import { ProductService } from 'src/app/product/product.service';
+import { Component, Input } from '@angular/core';
 import { ImageService } from '../image.service';
- 
+
+/**
+ * Shows the stored image of one product.
+ * The URL comes from ImageService.getImageUrl_nginx(productId); a broken image
+ * falls back to the shared fallback image. No blobs / object URLs are created,
+ * so nothing needs to be released.
+ */
 @Component({
   selector: 'app-image-viewer',
   templateUrl: './image-viewer.component.html',
   styleUrl: './image-viewer.component.css'
 })
-export class ImageViewerComponent implements OnInit{
+export class ImageViewerComponent {
+  @Input() productId: number | null = null;
+  @Input() alt = 'Product image';
 
+  constructor(public imageService: ImageService) {}
 
-constructor(
-    public imageService: ImageService, 
-    private productService:ProductService, 
-    private http: HttpClient, 
-   ){
-}
-    ngOnInit(): void {
-    const imageKey = 'productList'; // 🔑 Your Redis/image key
-
-    this.imageService.getImageByKey(imageKey).subscribe({
-      next: (blob: Blob) => {
-        const objectUrl = URL.createObjectURL(blob);
-        this.imageService.imageSrc = objectUrl;
-      },
-      error: (err) => {
-        console.error('❌ Failed to load image:', err);
-      },
-    });
+  get src(): string | null {
+    return this.productId === null || this.productId === undefined
+      ? null
+      : this.imageService.getImageUrl_nginx(this.productId);
   }
 
- 
+  onError(event: Event): void {
+    this.imageService.onImageError(event, this.productId ?? undefined);
+  }
 }

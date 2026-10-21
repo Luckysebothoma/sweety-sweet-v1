@@ -22,9 +22,15 @@
       <th mat-header-cell *matHeaderCellDef>ID</th>
       <td mat-cell *matCellDef="let row; let i = index">
         {{ row.productId }}
-        <img [src]="imageService.getImageUrl_nginx(row.productId)" alt="Product image" class="product-image"
-              (error)="onImageError($event)"
->
+        <ng-container *ngIf="editIndex === i; else viewImage">
+          <app-image-viewer [productId]="row.productId"></app-image-viewer>
+          <app-image-upload label="Replace image" (fileSelected)="onEditImageSelected($event)"></app-image-upload>
+          <small>Stored as "name flavor.webp" — if you rename the product, upload the image again.</small>
+        </ng-container>
+        <ng-template #viewImage>
+          <img [src]="imageService.getImageUrl_nginx(row.productId)" alt="Product image" class="product-image"
+               (error)="onImageError($event)">
+        </ng-template>
       </td>
     </ng-container>
 
@@ -149,6 +155,7 @@
 
         <ng-template #defaultButtons> 
           <button class="btn btn-danger btn-sm" (click)="removeCandy(row, i)">🗑️ Remove</button>
+          <button class="btn btn-info btn-sm" (click)="openDetails(row)">Details &amp; image</button>
           <button class="btn btn-primary btn-sm" (click)="editRow(row, i)">✏️ Edit</button>
         </ng-template>
       </td>

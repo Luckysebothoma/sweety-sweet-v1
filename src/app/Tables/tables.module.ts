@@ -25,6 +25,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
  
 
+import { ImageModule } from '../Images/image-module.module';
+
 @NgModule({
   declarations: [
     AvailableItemsListTableComponent,
@@ -48,7 +50,7 @@ import { MatSelectModule } from '@angular/material/select';
      StockPrevTableComponent 
   ],
   imports: [
-    CommonModule,
+    CommonModule, ImageModule,
     FormsModule,ReactiveFormsModule,// For [(ngModel)]
     MatTableModule,      // For <table mat-table>
     MatPaginatorModule, MatIconModule, MatCardModule,

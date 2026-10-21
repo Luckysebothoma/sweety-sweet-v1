@@ -3,6 +3,7 @@ import { environment } from 'src/environments/environment';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, catchError, concatMap, defer, finalize, forkJoin, map, of, tap, throwError } from 'rxjs';
 import { Product } from '../models/product';
+import { buildProductImageName } from '../Images/image-utils';
 
 import { Calendar2024 } from '../Class/Calender/calendar2024';
 import { ApiResponseTransformService } from '../Services/api-response-transform.service';
@@ -1612,36 +1613,80 @@ export class ProductService {
     });
   }
 
-  /** Returns a Tracer that is filled in when the updates finish (same contract as before, now with a proper message). */
+  /** Observable form of the 5-call product update: emits once on success, errors on failure. */
+  updateYummyListTable$(
+    productList: ProductList[],
+    pricingList: ProductPricing[],
+    availableItems: AvailableItems[],
+    priceTracingList: PriceTracing[]
+  ): Observable<unknown> {
+    const product = productList?.[0];
+    const pricing = pricingList?.[0];
+    const available = availableItems?.[0];
+    const tracing = priceTracingList?.[0];
+    if (!product || !pricing || !available || !tracing) {
+      return throwError(() => new Error('Missing one or more required data objects for updating.'));
+    }
+    return forkJoin([
+      this.updateProductListByID('updateProductList', product),
+      this.updateProductPricing('updateProductPricing', pricing),
+      this.updateAvailableItems(available),
+      this.updatePriceTracing(tracing),
+      this.updateYummyList(pricing)
+    ]).pipe(tap(() => this.loadAllProductDetails(true)));
+  }
+
+  /**
+   * Legacy API kept for existing callers. NOTE: the returned Tracer is filled in
+   * asynchronously, so do not read `status` synchronously - use updateYummyListTable$ / submitProductEdit$.
+   */
   updateYummyListTable(
     productList: ProductList[],
     pricingList: ProductPricing[],
     availableItems: AvailableItems[],
     priceTracingList: PriceTracing[]
   ): Tracer {
-    const t: Tracer = { status: false, message: '' };
-    const product = productList?.[0];
-    const pricing = pricingList?.[0];
-    const available = availableItems?.[0];
-    const tracing = priceTracingList?.[0];
-
-    if (!product || !pricing || !available || !tracing) {
-      t.message = '❌ Missing one or more required data objects for updating.';
-      return t;
-    }
-
-    t.message = 'Updating…';
-    forkJoin([
-      this.updateProductListByID('updateProductList', product),
-      this.updateProductPricing('updateProductPricing', pricing),
-      this.updateAvailableItems(available),
-      this.updatePriceTracing(tracing),
-      this.updateYummyList(pricing)
-    ]).subscribe({
-      next: () => { t.status = true; t.message = '✅ YummyList row updated successfully.'; this.loadAllProductDetails(true); },
+    const t: Tracer = { status: false, message: 'Updating...' };
+    this.updateYummyListTable$(productList, pricingList, availableItems, priceTracingList).subscribe({
+      next: () => { t.status = true; t.message = '✅ YummyList row updated successfully.'; },
       error: err => { t.status = false; t.message = `❌ Failed to update YummyList row: ${this.msg(err)}`; }
     });
     return t;
+  }
+
+  /**
+   * Single validated save path for an edited product (used by the table's inline edit
+   * and by the Edit form). Shows the success/error message and emits true only after
+   * the server confirmed all updates.
+   */
+  submitProductEdit$(y: YummyList): Observable<boolean> {
+    const ok = (v: any) => v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+    if (!y || !y.productId || !y.productName || !y.productFlavor || !ok(y.productPrice) || !ok(y.productQuantity)) {
+      this.showError('⚠️ Invalid data: name, flavor, price and quantity are required.');
+      return of(false);
+    }
+    const productList: ProductList[] = [{
+      productId: y.productId,
+      productName: y.productName,
+      productFlavor: y.productFlavor,
+      productPrice: y.productPrice,
+      image_url: buildProductImageName(y.productName, y.productFlavor)
+    } as ProductList];
+    const pricingList: ProductPricing[] = [{
+      productId: y.productId,
+      productSize: y.productSize,
+      productQuantity: y.productQuantity,
+      sellingPrice: y.sellingPrice,
+      productCommission: y.productCommission,
+      productProfit: y.productProfit,
+      costPerItem: y.costPerItem,
+      itemGrouping: y.itemGrouping
+    } as ProductPricing];
+    this.showLoading('Saving product changes...');
+    return this.updateYummyListTable$(productList, pricingList, [this.createAvailableItem(y)], [this.createPriceTracing(y)]).pipe(
+      map(() => { this.showSuccess('✅ Product updated'); return true; }),
+      catchError(err => { this.showError(`❌ Failed to update product: ${this.msg(err)}`); return of(false); })
+    );
   }
 
   updateSodEod(productList: SOD_EOD): Observable<void[]> {

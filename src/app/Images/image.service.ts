@@ -35,6 +35,11 @@ export class ImageService {
     private dateTimeService: DateTimeService,
     private metricsService: MetricsService
   ) {
+    this.refreshProductList();
+  }
+
+  /** (Re)loads the product list used to build image URLs. */
+  refreshProductList(): void {
     this.httpClientService
       .get<ProductList>(
         environment.backend_get_endpoints.getProductList,
@@ -49,6 +54,16 @@ export class ImageService {
           console.error(`${this.global_Class_name} - failed to load product list`, err);
         }
       });
+  }
+
+  /**
+   * Keeps the local product list in step with a product that was just added or edited,
+   * so its image URL is correct immediately (without waiting for a server round-trip).
+   */
+  rememberProduct(p: { productId: any; productName: string; productFlavor: string; [k: string]: any }): void {
+    const id = Number(p.productId);
+    const entry = { ...(this.productList.find(x => Number(x.productId) === id) ?? {}), ...p, productId: id } as ProductList;
+    this.productList = [...this.productList.filter(x => Number(x.productId) !== id), entry];
   }
 
   private expose_image_path(): string {
@@ -70,6 +85,8 @@ export class ImageService {
    */
   onImageError(event: Event, productId?: any) {
     const target = event.target as HTMLImageElement;
+    // Guard: if the fallback itself fails to load, do not loop forever.
+    if (target.src === this.fallbackImage) return;
     target.src = this.fallbackImage;
     console.warn(
       `⚠️ ${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-onImageError ` +
@@ -102,6 +119,17 @@ export class ImageService {
       next: (response) => console.log('Upload success', response),
       error: (err) => console.error('Upload failed', err)
     });
+  }
+
+  /**
+   * Uploads a product image to the verified middleware route POST {apiUrl}/upload
+   * (environment.imagePath). The multer field name there is 'images'.
+   * The stored name is the given fileName (the server prefixes a unique stamp).
+   */
+  uploadProductImage(blob: Blob, fileName: string): Observable<unknown> {
+    const formData = new FormData();
+    formData.append('images', blob, fileName);
+    return this.http.post(environment.apiUrl + environment.imagePath, formData);
   }
 
   uploadImageWithKey(file: File, key: string) {

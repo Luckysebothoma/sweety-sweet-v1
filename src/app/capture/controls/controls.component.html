@@ -68,6 +68,7 @@
 <!--  <app-edit-existing></app-edit-existing> -->
 <!--  <app-edit-image-viewer></app-edit-image-viewer>  -->
   <app-yummy-list-table></app-yummy-list-table>
+  <app-edit-existing></app-edit-existing>
 </ng-template>
 
 <!-- Add New Tab -->
@@ -105,6 +106,9 @@
               <input matInput type="number" formControlName="productPrice" required />
             </mat-form-field>
           </div>
+
+          <app-image-upload label="Product image (optional)"
+                            (fileSelected)="onProductImageSelected($event)"></app-image-upload>
 
           <div class="flex justify-start space-x-4 mt-4">
             <button mat-flat-button color="primary" matStepperNext (click)="submitForm()" type="submit">

@@ -1,21 +1,16 @@
 <div class="image-upload-container">
-  
+  <label class="image-upload-label">{{ label }}</label>
   <div class="file-selection">
-    <input type="file" (change)="onFileChange($event)" accept="image/*" />
+    <input #fileInput type="file" accept="image/jpeg,image/png,image/webp"
+           (change)="onFileChange($event)" />
   </div>
-  
-  <div class="" *ngIf="imageService.ReadyTopreviewUrl">
-    <div class="file-details" *ngIf="productService.selectedFiles">
 
-      <p><strong>File Name:</strong> {{productService.fileName}}</p>
-      <p><strong>File Type:</strong> {{productService.fileType}}</p>
-      <p><strong>File Size:</strong> {{(productService.fileSize / 1024).toFixed(2)}} KB</p>
-      <p><strong>New File Key:</strong> {{productService.key}}</p>
-    
-    </div>
+  <div class="image-preview" *ngIf="previewUrl && file">
+    <img [src]="previewUrl" alt="Selected image preview"
+         style="max-width: 160px; max-height: 160px; display: block; margin: 8px 0;" />
+    <p><strong>{{ file.name }}</strong> ({{ sizeKb }} KB)</p>
+    <button type="button" (click)="clear(fileInput)">Remove image</button>
   </div>
-  
-  <div class="message" *ngIf="productService.message">
-    <p>{{productService.message}}</p>
-  </div>
+
+  <p class="image-error" role="alert" *ngIf="error" style="color: #b00020;">{{ error }}</p>
 </div>

@@ -1,3 +1,4 @@
+<ng-container *ngFor="let selected of (selectedId === null ? [] : [selectedId])">
 <mat-card class="p-4" [formGroup]="editForm">
   <mat-card-title>Edit Product</mat-card-title>
   <mat-card-content>
@@ -46,14 +47,18 @@
 
       </div>
 
-      <app-edit-image-viewer></app-edit-image-viewer>
+      <app-edit-image-viewer [productId]="selectedId" [pendingFile]="imageFile"></app-edit-image-viewer>
+      <app-image-upload label="Replace image (optional)" (fileSelected)="onImageSelected($event)"></app-image-upload>
+      <small>The image is stored as "name flavor.webp"; if you rename the product, choose the image again.</small>
 
       <!-- Action Buttons -->
       <div class="button-row">
         <button mat-raised-button color="primary" type="submit">
           Apply Changes to Product {{ editForm.get('id')?.value }}
         </button>
+        <button mat-button type="button" (click)="close()">Close</button>
       </div>
     </form>
   </mat-card-content>
 </mat-card>
+</ng-container>

@@ -16,6 +16,8 @@ import {MatButtonModule} from '@angular/material/button';
 import { LoaderBounceService } from 'src/app/iframe/loader-bounce.service';
 import { MatTableServiceService } from 'src/app/Services/mat-table-service.service';
 import { AuthService } from '@auth0/auth0-angular';
+import { ViewChild } from '@angular/core';
+import { ImageUploadComponent } from 'src/app/Images/image-upload/image-upload.component';
 
 
 
@@ -149,9 +151,16 @@ goToImageStep(stepper: MatStepper): void {
 }
 
 
+@ViewChild(ImageUploadComponent) imageUpload?: ImageUploadComponent;
+
+onProductImageSelected(file: File | null): void {
+  this.captureService.pendingImage = file;
+}
+
 resetStepper(stepper:any){
   stepper.reset();
   this.captureService.httpCallDOne = false;
+  this.imageUpload?.clear();
 }
 async submitAll(stepper: MatStepper): Promise<void> {
 
@@ -224,6 +233,7 @@ submitProductDetails() {
 
 clearProductForm() {
   this.matTableService.clearForm();
+  this.imageUpload?.clear();
 }
 
   sod_eod_Toggle():void {
