@@ -7,6 +7,7 @@ import { HttpClientService } from '../Services/http-client.service';
 import { DateTimeService } from '../Services/date-time.service';
 import { ResponseUtils } from '../Services/response-utils';
 import { MetricsService } from '../Services/metrics.service';
+import { buildProductImageName } from './image-utils';
 
 @Injectable({
   providedIn: 'root'
@@ -25,6 +26,7 @@ export class ImageService {
   // single source of truth for the r2 webp bucket path (was duplicated as `expose` + `webp_url`)
   webp_url = environment.expose_image.local_images || '';
   fallbackImage = environment.expose_image.fallbackImage; // local fallback image path
+  private normalizedFallback = '';
   loader_bounce: string = environment.expose_gif_loading.infinite;
 
   private baseUrl = environment.expose_image.local_images || '';
@@ -86,10 +88,13 @@ export class ImageService {
   onImageError(event: Event, productId?: any) {
     const target = event.target as HTMLImageElement;
     // Guard: if the fallback itself fails to load, do not loop forever.
-    // (Flag on the element rather than comparing src: browsers normalise/re-encode src,
-    // so a string comparison against a data: or remote URL can silently fail.)
-    if (target.dataset['fallbackApplied'] === '1' || target.src === this.fallbackImage) return;
-    target.dataset['fallbackApplied'] = '1';
+    // Compare against the browser-normalised form of the fallback URL (browsers re-encode `src`).
+    if (!this.normalizedFallback) {
+      const probe = new Image();
+      probe.src = this.fallbackImage;
+      this.normalizedFallback = probe.src;
+    }
+    if (target.src === this.normalizedFallback || target.src === this.fallbackImage) return;
     target.src = this.fallbackImage;
     console.warn(
       `⚠️ ${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-onImageError ` +
@@ -175,19 +180,11 @@ export class ImageService {
   }
 
   getProductUrl(productId: number): string {
-    let url = 'Product0';
-
-    if (this.productList && this.productList.length > 0) {
-      for (const prod of this.productList) {
-        if (productId === prod.productId) {
-          const fileName = `${prod.productName} ${prod.productFlavor}.webp`;
-          url = encodeURI(`${environment.expose_image.local_images}/${fileName}`);
-          break;
-        }
-      }
-    }
-
-    return url;
+    const prod = (this.productList ?? []).find(p => Number(p.productId) === Number(productId));
+    // Product list not loaded yet / unknown product: show the fallback instead of requesting a bogus relative URL.
+    if (!prod) return this.fallbackImage;
+    // Same naming rule the upload uses; the server stores the file under exactly this name.
+    return `${environment.expose_image.local_images}/${encodeURIComponent(buildProductImageName(prod.productName, prod.productFlavor))}`;
   }
 
   /**

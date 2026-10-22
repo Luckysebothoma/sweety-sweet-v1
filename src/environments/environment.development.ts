@@ -19,7 +19,7 @@ export const environment = {
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-            local_images:"https://192.168.0.140:8183",
+            local_images:"https://192.168.0.140:8183/uploads", // product images live on sweety-api /uploads (stored under their exact name)
             nginx:"https://192.168.0.140:8183",
             hono:"https://192.168.0.140:8183/images",
             fallbackImage: FALLBACK_IMAGE
