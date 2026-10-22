@@ -194,7 +194,7 @@ export class ImageService {
    * merged console.log. Now just returns the URL.
    */
   getImageUrlByProductSS(relativePath: string): string {
-    return `${environment.expose_image}/${relativePath}`;
+    return `${environment.expose_image.local_images}/${relativePath}`;
   }
 
   getImageKeys() {

@@ -15,8 +15,9 @@ node_modules/
 *.pem
 *.crt
 *.key
-
-
+*.fix
+*.test
+*.data
 .prometheus_data
 
 content_Management_System/

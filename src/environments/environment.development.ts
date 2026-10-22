@@ -83,7 +83,7 @@ export const metrics = {
   },
   frontEndFullUrl: {
     frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
-    frontendErrorUrl: 'https://192.168.0.140:8183f/rontend-error',
+    frontendErrorUrl: 'https://192.168.0.140:8183/frontend-error',
     frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics',
  
 

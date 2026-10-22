@@ -79,7 +79,7 @@ loadData(){
 
 }
   getImageUrl(relativePath: string): string {
-    return `${environment.expose_image}/${relativePath}`;
+    return `${environment.expose_image.local_images}/${relativePath}`;
   }
 
   startEdit(index: number, element:any): void {
