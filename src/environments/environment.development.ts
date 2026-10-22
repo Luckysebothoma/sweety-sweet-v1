@@ -20,27 +20,27 @@ export const environment = {
             local_images:"https://192.168.0.140:3007",
             nginx:"https://192.168.0.140:3007",
             hono:"https://192.168.0.140:3009/images",
-            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+            fallbackImage: "https://192.168.0.140:8183/failures/failure.webp"
 
     },
     expose_gif_failures:{
-            cross:"https://192.168.0.140:3007/failures/failure_cross.gif",
-            shake:"https://192.168.0.140:3007/failures/failure_shake.gif",
-            sad:"https://192.168.0.140:3009/failures/failure_sad.gif",
-            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+            cross:"https://192.168.0.140:8183/images/failures/failure_cross.gif",
+            shake:"https://192.168.0.140:8183/images/failures/failure_shake.gif",
+            sad:"https://192.168.0.140:3009/images/failures/failure_sad.gif",
+            fallbackImage: "https://192.168.0.140:8183/images/failures/failure.webp"
 
     },expose_gif_loading:{
-            gear:"https://192.168.0.140:3007/loading/loading_gear.gif",
-            infinite:"https://192.168.0.140:3007/loading/loading_infinite.gif",
+            gear:"https://192.168.0.140:8183/loading/loading_gear.gif",
+            infinite:"https://192.168.0.140:8183/loading/loading_infinite.gif",
             maze:"https://192.168.0.140:3009/loading/loading_maze.gif",
-            fallbackImage: "https://192.168.0.140:3007/failures/failure.webp"
+            fallbackImage: "https://192.168.0.140:8183/images/failures/failure.webp"
 
     },cloudflare_proxy:{
-      webp:"https://192.168.0.140:3007/webp",
-      loader:"https://192.168.0.140:3007/loader" 
+      webp:"https://192.168.0.140:8183/webp",
+      loader:"https://192.168.0.140:8183/loader" 
 
     },
-        expose_image_gif:"https://192.168.0.140:3007/images/gif",
+        expose_image_gif:"https://192.168.0.140:8183/images/gif",
 
 	  nodejs:{
         full_api_path:'https://192.168.0.140:8183/api/v1/student',
@@ -69,7 +69,7 @@ export const environment = {
     }
     
 };
- 
+  
 export const metrics = {
   monitoring: {
     server: 'https://192.168.0.140:8183', // 🔧 Replace with process.env or override during deployment
