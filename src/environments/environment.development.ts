@@ -1,4 +1,6 @@
-
+// Inline placeholder: no network request, so it can never 404 (previously pointed at
+// <host>/failures/failure.webp, which the API/nginx did not serve -> a 404 per broken <img>).
+const FALLBACK_IMAGE = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='12' fill='%23f1f3f5'/%3E%3Cpath d='M30 84l22-26 16 18 10-12 12 20z' fill='%23ced4da'/%3E%3Ccircle cx='44' cy='40' r='8' fill='%23ced4da'/%3E%3Cpath d='M20 20l80 80' stroke='%23adb5bd' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E";
 export const environment = {
 	production: false,
   stock_nodejs_server_endpoint:"https://stock-backend:8080/api/stock/process", 
@@ -17,23 +19,23 @@ export const environment = {
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-            local_images:"https://192.168.0.140:3007",
-            nginx:"https://192.168.0.140:3007",
-            hono:"https://192.168.0.140:3009/images",
-            fallbackImage: "https://192.168.0.140:8183/failures/failure.webp"
+            local_images:"https://192.168.0.140:8183",
+            nginx:"https://192.168.0.140:8183",
+            hono:"https://192.168.0.140:8183/images",
+            fallbackImage: FALLBACK_IMAGE
 
     },
     expose_gif_failures:{
             cross:"https://192.168.0.140:8183/images/failures/failure_cross.gif",
             shake:"https://192.168.0.140:8183/images/failures/failure_shake.gif",
-            sad:"https://192.168.0.140:3009/images/failures/failure_sad.gif",
-            fallbackImage: "https://192.168.0.140:8183/images/failures/failure.webp"
+            sad:"https://192.168.0.140:8183/images/failures/failure_sad.gif",
+            fallbackImage: FALLBACK_IMAGE
 
     },expose_gif_loading:{
             gear:"https://192.168.0.140:8183/loading/loading_gear.gif",
             infinite:"https://192.168.0.140:8183/loading/loading_infinite.gif",
-            maze:"https://192.168.0.140:3009/loading/loading_maze.gif",
-            fallbackImage: "https://192.168.0.140:8183/images/failures/failure.webp"
+            maze:"https://192.168.0.140:8183/loading/loading_maze.gif",
+            fallbackImage: FALLBACK_IMAGE
 
     },cloudflare_proxy:{
       webp:"https://192.168.0.140:8183/webp",
@@ -89,4 +91,3 @@ export const metrics = {
 
   }
 };
-

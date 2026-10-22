@@ -86,7 +86,10 @@ export class ImageService {
   onImageError(event: Event, productId?: any) {
     const target = event.target as HTMLImageElement;
     // Guard: if the fallback itself fails to load, do not loop forever.
-    if (target.src === this.fallbackImage) return;
+    // (Flag on the element rather than comparing src: browsers normalise/re-encode src,
+    // so a string comparison against a data: or remote URL can silently fail.)
+    if (target.dataset['fallbackApplied'] === '1' || target.src === this.fallbackImage) return;
+    target.dataset['fallbackApplied'] = '1';
     target.src = this.fallbackImage;
     console.warn(
       `⚠️ ${this.dateTimeService.formatDate(Date.now())} ${this.global_Class_name}-onImageError ` +
