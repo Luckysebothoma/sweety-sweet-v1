@@ -28,24 +28,24 @@
 .table-responsive {
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fb-divider);
   border-radius: 6px;
 }
 
 /* Row color indicators based on content */
 .low-amount,
 .low {
-  background-color: #ffebee; /* Soft red for warnings */
+  background-color: var(--fb-danger-bg); /* Soft red for warnings */
 }
 
 .middle {
-  background-color: #fff9c4; /* Soft yellow */
+  background-color: var(--fb-warning-bg); /* Soft yellow */
 }
 
 .full {
-  background-color: #e8f5e9; /* Soft green */
+  background-color: var(--fb-success-bg); /* Soft green */
 }
 
 .invalid {
-  background-color: #cfd8dc; /* Muted gray-blue */
+  background-color: var(--fb-hover-bg); /* Muted gray-blue */
 }

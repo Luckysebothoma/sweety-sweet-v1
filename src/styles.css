@@ -1,0 +1,197 @@
+/* >>> FB-THEME START — managed by fb-css-revamp.sh. Re-running --apply replaces this block. */
+/* ---------------------------------------------------------------------------
+   1. DESIGN TOKENS — change a value here and the whole app follows.
+      Component CSS must use var(--fb-*) only, never raw hex.
+   --------------------------------------------------------------------------- */
+:root {
+  /* brand */
+  --fb-blue:        #1877f2;
+  --fb-blue-hover:  #166fe5;
+  --fb-blue-dark:   #0a5bc4;
+  --fb-blue-soft:   #e7f3ff;               /* selected / hover tint */
+  --fb-blue-ring:   rgba(24, 119, 242, .25);
+  /* semantic */
+  --fb-green:       #42b72a;
+  --fb-green-hover: #36a420;
+  --fb-green-dark:  #2b8a1a;
+  --fb-success-bg:  #e9f7e6;
+  --fb-danger:      #fa383e;
+  --fb-danger-hover:#e0282e;
+  --fb-danger-dark: #b3171c;
+  --fb-danger-bg:   #ffebec;
+  --fb-warning:     #f7b928;
+  --fb-warning-text:#8a5300;
+  --fb-warning-bg:  #fff8e1;
+  /* neutrals */
+  --fb-bg:          #f0f2f5;               /* page background */
+  --fb-surface:     #ffffff;               /* cards, navbars, tables */
+  --fb-border:      #ced0d4;
+  --fb-divider:     #dadde1;
+  --fb-hover-bg:    #e4e6eb;
+  --fb-text:        #050505;
+  --fb-text-muted:  #65676b;
+  --fb-scroll:      #bcc0c4;
+  --fb-scroll-hover:#8a8d91;
+  /* shape / depth / type */
+  --fb-radius:      8px;
+  --fb-radius-sm:   6px;
+  --fb-shadow:      0 1px 2px rgba(0, 0, 0, .2);
+  --fb-shadow-lg:   0 2px 12px rgba(0, 0, 0, .15);
+  --fb-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  /* spacing scale */
+  --fb-space-1: 4px;  --fb-space-2: 8px;  --fb-space-3: 12px;
+  --fb-space-4: 16px; --fb-space-5: 24px; --fb-space-6: 32px;
+  /* Bootstrap 5 bridge (only matters where bootstrap.min.css is loaded) */
+  --bs-primary: #1877f2;  --bs-primary-rgb: 24, 119, 242;
+  --bs-success: #42b72a;  --bs-danger: #fa383e;  --bs-warning: #f7b928;
+  --bs-link-color: #1877f2;  --bs-link-hover-color: #166fe5;
+  --bs-body-bg: #f0f2f5;  --bs-body-color: #050505;
+  --bs-border-color: #ced0d4;  --bs-body-font-family: var(--fb-font);
+}
+
+/* Angular Material shape / elevation (colours come from src/theme-facebook.css) */
+html {
+  --mdc-elevated-card-container-shape: var(--fb-radius);
+  --mdc-outlined-card-container-shape: var(--fb-radius);
+  --mdc-elevated-card-container-elevation: var(--fb-shadow);
+  --mdc-dialog-container-shape: var(--fb-radius);
+  --mdc-text-button-container-shape: var(--fb-radius-sm);
+  --mdc-filled-button-container-shape: var(--fb-radius-sm);
+  --mdc-protected-button-container-shape: var(--fb-radius-sm);
+  --mdc-outlined-button-container-shape: var(--fb-radius-sm);
+  --mdc-outlined-text-field-container-shape: var(--fb-radius-sm);
+  --mdc-filled-text-field-container-shape: var(--fb-radius-sm);
+  --mat-menu-container-shape: var(--fb-radius-sm);
+  --mat-autocomplete-container-shape: var(--fb-radius-sm);
+  --mdc-protected-button-container-elevation-shadow: var(--fb-shadow);
+  --mdc-protected-button-hover-container-elevation-shadow: var(--fb-shadow-lg);
+  --mdc-protected-button-focus-container-elevation-shadow: var(--fb-shadow);
+  --mdc-protected-button-pressed-container-elevation-shadow: none;
+  --mat-dialog-container-max-width: 95vw;
+  --mat-dialog-container-small-max-width: 95vw;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fb-scroll) transparent;
+}
+
+/* ---------------------------------------------------------------------------
+   2. BASE
+   --------------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--fb-bg);
+  color: var(--fb-text);
+  font-family: var(--fb-font);
+  font-size: 15px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4, h5, h6 { color: var(--fb-text); font-weight: 700; line-height: 1.2; margin: 0 0 .5em; }
+h1 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); }
+h2 { font-size: clamp(1.25rem, 1.1rem + .8vw, 1.5rem); }
+h3 { font-size: 1.125rem; }
+p  { margin: 0 0 .75em; }
+a  { color: var(--fb-blue); text-decoration: none; }
+a:not([class]):hover { text-decoration: underline; }
+img, video { max-width: 100%; }
+hr { border: 0; border-top: 1px solid var(--fb-divider); margin: var(--fb-space-4) 0; }
+::selection { background: var(--fb-blue-soft); }
+:focus-visible { outline: 2px solid var(--fb-blue); outline-offset: 2px; }
+
+/* scrollbars (WebKit) */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--fb-scroll); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--fb-scroll-hover); }
+
+/* ---------------------------------------------------------------------------
+   3. LAYOUT HELPERS
+   --------------------------------------------------------------------------- */
+.container, .container-sm {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: var(--fb-space-4) clamp(12px, 3vw, 24px);
+}
+.container-sm { max-width: 800px; }
+.fb-card, .card, .mat-mdc-card {
+  background: var(--fb-surface);
+  border: 0;
+  border-radius: var(--fb-radius);
+  box-shadow: var(--fb-shadow);
+}
+.fb-card { padding: var(--fb-space-4); }
+.fb-grid { display: grid; gap: var(--fb-space-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.text-center { text-align: center; }
+.text-right  { text-align: right; }
+.text-muted  { color: var(--fb-text-muted); }
+.table-scroll, .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------------------------------------------------------------------------
+   4. BUTTONS
+   --------------------------------------------------------------------------- */
+.mat-mdc-button, .mat-mdc-raised-button, .mat-mdc-unelevated-button, .mat-mdc-outlined-button {
+  text-transform: none; letter-spacing: 0; font-weight: 600; border-radius: var(--fb-radius-sm);
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--fb-space-2);
+  padding: 8px 16px; border: 0; border-radius: var(--fb-radius-sm);
+  font: 600 15px/1.2 var(--fb-font);
+  background: var(--fb-hover-bg); color: var(--fb-text);
+  cursor: pointer; transition: background-color .15s ease;
+}
+.btn:hover { background: var(--fb-divider); }
+.btn-primary { background: var(--fb-blue);  color: #fff; }
+.btn-primary:hover { background: var(--fb-blue-hover); }
+.btn-success { background: var(--fb-green); color: #fff; }
+.btn-success:hover { background: var(--fb-green-hover); }
+.btn-danger  { background: var(--fb-danger); color: #fff; }
+.btn-danger:hover  { background: var(--fb-danger-hover); }
+.btn:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------------------
+   5. FORMS  (:where() = zero specificity, Material inputs are excluded)
+   --------------------------------------------------------------------------- */
+:where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([class*="mat-"]):not([class*="mdc-"]),
+       select:not([class*="mat-"]), textarea:not([class*="mat-"]), .form-control) {
+  font: inherit; color: var(--fb-text); background: var(--fb-surface);
+  border: 1px solid var(--fb-border); border-radius: var(--fb-radius-sm);
+  padding: 8px 12px; max-width: 100%;
+}
+:where(input:not([class*="mat-"]):not([class*="mdc-"]), select:not([class*="mat-"]), textarea:not([class*="mat-"]), .form-control):focus {
+  outline: none; border-color: var(--fb-blue); box-shadow: 0 0 0 3px var(--fb-blue-ring);
+}
+
+/* ---------------------------------------------------------------------------
+   6. TABLES  (old .mat-cell names + current .mat-mdc-cell names)
+   --------------------------------------------------------------------------- */
+:where(table) { width: 100%; border-collapse: collapse; }
+.mat-mdc-table, .mat-table { background: var(--fb-surface); font-family: var(--fb-font); }
+.mat-mdc-header-row, .mat-header-row { background: var(--fb-bg); }
+.mat-mdc-header-cell, .mat-header-cell { color: var(--fb-text-muted); font-weight: 600; font-size: 13px; }
+.mat-mdc-cell, .mat-cell { color: var(--fb-text); }
+.mat-mdc-row:hover, .mat-row:hover { background: var(--fb-blue-soft); }
+
+/* ---------------------------------------------------------------------------
+   7. NAV / TOOLBAR / ALERTS
+   --------------------------------------------------------------------------- */
+.mat-toolbar { font-family: var(--fb-font); box-shadow: var(--fb-shadow); }
+.alert-success { color: var(--fb-green-dark);   background: var(--fb-success-bg); border-left: 4px solid var(--fb-green); }
+.alert-danger,
+.alert-critical{ color: var(--fb-danger-dark);  background: var(--fb-danger-bg);  border-left: 4px solid var(--fb-danger); }
+.alert-warning { color: var(--fb-warning-text); background: var(--fb-warning-bg); border-left: 4px solid var(--fb-warning); }
+
+/* ---------------------------------------------------------------------------
+   8. RESPONSIVE  (mobile-first thinking; breakpoints used everywhere: 768 / 576)
+   --------------------------------------------------------------------------- */
+@media (max-width: 768px) {
+  body { font-size: 14px; }
+  .hide-md { display: none !important; }
+}
+@media (max-width: 576px) {
+  .mat-toolbar { padding-inline: 12px; }
+  .hide-sm { display: none !important; }
+  .fb-card { padding: var(--fb-space-3); }
+}
+/* <<< FB-THEME END */

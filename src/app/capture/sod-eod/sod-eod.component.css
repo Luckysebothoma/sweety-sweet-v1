@@ -5,7 +5,7 @@
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   margin: 16px 0;
-  background-color: #ffffff;
+  background-color: var(--fb-surface);
 }
 
 /* Table Styles */
@@ -17,7 +17,7 @@
 
 /* Table Border Styles */
 .mat-table {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--fb-divider);
   border-radius: 8px;
 }
 
@@ -25,29 +25,29 @@
 .mat-table th {
   position: sticky;
   top: 0;
-  background-color: #f5f5f5;
+  background-color: var(--fb-bg);
   font-weight: 600;
-  color: #333;
-  border: 1px solid #e0e0e0;
+  color: var(--fb-text);
+  border: 1px solid var(--fb-divider);
   padding: 12px 16px;
   z-index: 10;
 }
 
 /* Cell Styles */
 .mat-table td {
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--fb-divider);
   padding: 10px 16px;
-  color: #444;
+  color: var(--fb-text);
 }
 
 /* Row Striping */
 .mat-table tr:nth-child(even) {
-  background-color: #f9f9f9;
+  background-color: var(--fb-bg);
 }
 
 /* Hover Effect */
 .mat-table tr:hover {
-  background-color: #f0f0f0;
+  background-color: var(--fb-bg);
   transition: background-color 0.2s ease;
 }
 
@@ -58,17 +58,17 @@
 }
 
 .mat-table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--fb-bg);
   border-radius: 4px;
 }
 
 .mat-table-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--fb-scroll);
   border-radius: 4px;
 }
 
 .mat-table-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--fb-scroll-hover);
 }
 
 /* Alert State Styles */
@@ -83,33 +83,33 @@
 
 /* Specific Alert States */
 .alert-warning {
-  background-color: #ffc107;
-  color: #000;
-  border-left: 4px solid #ffab00;
+  background-color: var(--fb-warning);
+  color: var(--fb-text);
+  border-left: 4px solid var(--fb-warning);
 }
 
 .alert-invalid {
-  background-color: #9e9e9e;
-  color: #000;
-  border-left: 4px solid #757575;
+  background-color: var(--fb-text-muted);
+  color: var(--fb-text);
+  border-left: 4px solid var(--fb-text-muted);
 }
 
 .alert-danger {
-  background-color: #ffeb3b;
-  color: #000;
-  border-left: 4px solid #fbc02d;
+  background-color: var(--fb-warning);
+  color: var(--fb-text);
+  border-left: 4px solid var(--fb-warning);
 }
 
 .alert-critical {
-  background-color: #f44336;
-  color: #fff;
-  border-left: 4px solid #d32f2f;
+  background-color: var(--fb-danger);
+  color: var(--fb-surface);
+  border-left: 4px solid var(--fb-danger-dark);
 }
 
 .alert-success {
-  background-color: #4caf50;
-  color: #fff;
-  border-left: 4px solid #388e3c;
+  background-color: var(--fb-green);
+  color: var(--fb-surface);
+  border-left: 4px solid var(--fb-green-dark);
 }
 
 /* Text Alignment */

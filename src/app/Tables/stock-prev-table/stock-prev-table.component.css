@@ -8,14 +8,14 @@
 
 /* 1. Loading Spinner */
 .loading {
-  border: 3px solid #e0e0e0;
-  border-top: 3px solid #2196f3;
+  border: 3px solid var(--fb-divider);
+  border-top: 3px solid var(--fb-blue);
   animation: spin 1s linear infinite;
 }
 
 /* 2. Success (green tick pulse) */
 .success {
-  background-color: #4caf50;
+  background-color: var(--fb-green);
   mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M9 16.17l-3.88-3.88-1.42 1.41L9 19 20.3 7.71 18.89 6.29z"/></svg>') no-repeat center;
   -webkit-mask: same-as-mask;
   animation: pulse 1s ease-in-out infinite;
@@ -23,7 +23,7 @@
 
 /* 3. Error (red X shake) */
 .error {
-  background-color: #f44336;
+  background-color: var(--fb-danger);
   mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M18.3 5.71L12 12l6.3 6.29-1.42 1.42L10.59 13.4 4.3 19.71 2.88 18.29 9.17 12 2.88 5.71 4.3 4.29 10.59 10.6 16.88 4.29z"/></svg>') no-repeat center;
   -webkit-mask: same-as-mask;
   animation: shake 0.6s ease-in-out infinite;
@@ -31,19 +31,19 @@
 
 /* 4. Warning (yellow blink) */
 .warning {
-  background-color: #ff9800;
+  background-color: var(--fb-warning);
   animation: blink 1.2s ease-in-out infinite;
 }
 
 /* 5. Info (blue pulsing dot) */
 .info {
-  background-color: #03a9f4;
+  background-color: var(--fb-blue);
   animation: pulse 1.5s infinite;
 }
 
 /* 6. Offline (gray dot flash) */
 .offline {
-  background-color: #9e9e9e;
+  background-color: var(--fb-text-muted);
   animation: flash 1s step-end infinite;
 }
 
@@ -58,7 +58,7 @@
   content: '';
   width: 6px;
   height: 6px;
-  background-color: #673ab7;
+  background-color: var(--fb-blue-dark);
   border-radius: 50%;
   position: absolute;
   animation: bounce 1.5s infinite;

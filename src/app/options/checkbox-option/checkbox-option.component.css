@@ -1,5 +1,5 @@
 .checked-bg {
-  background-color: #d1ffd1; /* light green */
+  background-color: var(--fb-success-bg); /* light green */
   border-radius: 4px;
   padding: 5px;
 }

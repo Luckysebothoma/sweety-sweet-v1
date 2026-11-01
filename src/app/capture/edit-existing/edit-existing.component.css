@@ -1,6 +1,7 @@
 /* Wider input field for specific elements */
 .wide-input {
-  width: 300px;
+  width: 100%;
+  max-width: 300px;
 }
 
 /* All table inputs get consistent width */
@@ -16,12 +17,12 @@ table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  border: 1px solid #ccc;
+  border: 1px solid var(--fb-border);
 }
 
 /* Optional: Add borders to table cells */
 td, th {
-  border: 1px solid #ccc;
+  border: 1px solid var(--fb-border);
   padding: 8px;
   text-align: left;
   overflow: hidden;
@@ -32,7 +33,8 @@ td, th {
 /* Labels with consistent width */
 label {
   display: inline-block;
-  width: 250px;
+  width: 100%;
+  max-width: 250px;
   font-weight: bold;
 }
 
@@ -41,7 +43,7 @@ label {
   max-height: 500px;
   overflow-y: auto;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fb-divider);
   border-radius: 6px;
-  background-color: #fafafa;
+  background-color: var(--fb-bg);
 }

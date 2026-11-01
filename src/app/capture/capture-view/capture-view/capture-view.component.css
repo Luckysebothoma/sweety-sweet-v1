@@ -6,22 +6,22 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
-  background-color: #f5f7fa; /* Soft gray for light mode */
-  font-family: Arial, sans-serif;
+  background-color: var(--fb-bg); /* Soft gray for light mode */
+  font-family: var(--fb-font);
 }
 
 /* Wrapper for Core Layout */
 .wrapper {
-  width: 80vw;
-  height: 80vh;
+  width: min(92vw, 1200px);
+  min-height: 80vh;
   box-sizing: border-box;
-  background: linear-gradient(135deg, #ffffff, #f9f9f9); /* Soft gradient */
-  border: 1px solid #ccc;
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--fb-surface), var(--fb-bg)); /* Soft gradient */
+  border: 1px solid var(--fb-border);
+  border-radius: var(--fb-radius);
   display: flex;
   justify-content: center;
   align-items: center;
-  color: #333;
+  color: var(--fb-text);
   text-align: center;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -38,11 +38,11 @@ body {
 
 /* Section Background Variants */
 .custom-background {
-  background-color: #fffacc; /* Soft yellow */
+  background-color: var(--fb-blue-soft); /* Soft yellow */
 }
 
 .custom-background-state {
-  background-color: #ffe6f0; /* Soft pink */
+  background-color: var(--fb-blue-soft); /* Soft pink */
   max-width: 100%;
   overflow: auto;
   border-radius: 8px;
@@ -50,11 +50,11 @@ body {
 }
 
 .custom-background-report {
-  background-color: #f5e6ff; /* Lavender */
+  background-color: var(--fb-blue-soft); /* Lavender */
 }
 
 .custom-background-controls {
-  background-color: #e0f7fa; /* Aqua blue */
+  background-color: var(--fb-blue-soft); /* Aqua blue */
   height: 50%;
   padding: 10px;
   border-radius: 6px;
@@ -66,7 +66,7 @@ body {
   overflow: auto;
   display: block;
   padding-top: 3%;
-  border: 1px solid #ddd;
+  border: 1px solid var(--fb-divider);
   border-radius: 6px;
-  background-color: #ffffff;
+  background-color: var(--fb-surface);
 }

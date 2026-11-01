@@ -26,7 +26,7 @@
 
 /* Optional background utility class */
 .bak {
-  background-color: blue;
+  background-color: var(--fb-blue);
 }
 
 /* Scrollable checkbox list */
@@ -37,7 +37,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px; /* Space between checkboxes */
-  border: 1px solid #ccc;
+  border: 1px solid var(--fb-border);
   border-radius: 4px;
 }
 

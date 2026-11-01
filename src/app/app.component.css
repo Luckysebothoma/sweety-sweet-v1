@@ -23,14 +23,14 @@
   padding-right: 10px;
 
    scrollbar-width: thin;
-  scrollbar-color: #aaa transparent;
+  scrollbar-color: var(--fb-scroll) transparent;
 
   &::-webkit-scrollbar {
     width: 6px;
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: #ccc;
+    background-color: var(--fb-border);
     border-radius: 4px;
   }
 }
