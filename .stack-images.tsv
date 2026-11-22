@@ -1,0 +1,5 @@
+sweety-apache	sweety-sweet-v1-sweety-apache	192.168.0.140:5000/sweety-sweet-v1-sweety-apache:latest
+sweety-app	sweety-sweet-v1-sweety-app	192.168.0.140:5000/sweety-sweet-v1-sweety-app:latest
+sweety-app-dev	sweety-sweet-v1-sweety-app-dev	192.168.0.140:5000/sweety-sweet-v1-sweety-app-dev:latest
+sweety-tomcat	sweety-sweet-v1-sweety-tomcat	192.168.0.140:5000/sweety-sweet-v1-sweety-tomcat:latest
+sweety-wildfly	sweety-sweet-v1-sweety-wildfly	192.168.0.140:5000/sweety-sweet-v1-sweety-wildfly:latest
