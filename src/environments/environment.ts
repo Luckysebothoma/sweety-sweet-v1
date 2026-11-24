@@ -7,45 +7,45 @@ export const environment = {
     imagePath:"/upload",
     genearate_tempkey:"/images/temp-key",
 //	apiUrl: 'https:/node-js.justdo-it.uk'
-	apiUrl: 'https://192.168.0.140:8083',
+	apiUrl: 'https://192.168.0.140:8183',
 
 	redisPostgres:"https://redisPostgres.justdo-it.uk",
 	auth:{ 
         domain: 'dev-3ocho460qagqipds.us.auth0.com',
         clientId: '5NZZICITa9LCg8U0dNQraVhGqNiEpUTi',
-        audience:'https://linux.justdo-it.local:8083'
+        audience:'https://linux.justdo-it.local:8183'
     },
  
     expose_image:{
       r2bucket_png: "https://pub-6dc413a87c9f41549d36f8bdd8991609.r2.dev",
       r2bucket_webp: "https://pub-e0a0161176f44911add8cd4cf72ded4d.r2.dev",
-            local_images:"https://192.168.0.140:8083/uploads", // product images live on sweety-api /uploads (stored under their exact name)
+            local_images:"https://192.168.0.140:8183/uploads", // product images live on sweety-api /uploads (stored under their exact name)
             nginx:"https://192.168.0.140:3007",
             hono:"https://192.168.0.140:3009/images",
             fallbackImage: FALLBACK_IMAGE
 
     },
     expose_gif_failures:{
-            cross:"https://192.168.0.140:8083/images/failures/failure_cross.gif",
-            shake:"https://192.168.0.140:8083/images/failures/failure_shake.gif",
+            cross:"https://192.168.0.140:8183/images/failures/failure_cross.gif",
+            shake:"https://192.168.0.140:8183/images/failures/failure_shake.gif",
             sad:"https://192.168.0.140:3009/images/failures/failure_sad.gif",
             fallbackImage: FALLBACK_IMAGE
 
     },expose_gif_loading:{
-            gear:"https://192.168.0.140:8083/loading/loading_gear.gif",
-            infinite:"https://192.168.0.140:8083/loading/loading_infinite.gif",
+            gear:"https://192.168.0.140:8183/loading/loading_gear.gif",
+            infinite:"https://192.168.0.140:8183/loading/loading_infinite.gif",
             maze:"https://192.168.0.140:3009/loading/loading_maze.gif",
             fallbackImage: FALLBACK_IMAGE
 
     },cloudflare_proxy:{
-      webp:"https://192.168.0.140:8083/webp",
-      loader:"https://192.168.0.140:8083/loader"
+      webp:"https://192.168.0.140:8183/webp",
+      loader:"https://192.168.0.140:8183/loader"
 
     },
-        expose_image_gif:"https://192.168.0.140:8083/images/gif",
+        expose_image_gif:"https://192.168.0.140:8183/images/gif",
 
 	  nodejs:{
-        full_api_path:'https://192.168.0.140:8083/api/v1/student',
+        full_api_path:'https://192.168.0.140:8183/api/v1/student',
     },
     backend_endpoints:{
         addPriceTracing:'addPriceTracing',
@@ -74,7 +74,7 @@ export const environment = {
   
 export const metrics = {
   monitoring: {
-    server: 'https://192.168.0.140:8083', // 🔧 Replace with process.env or override during deployment
+    server: 'https://192.168.0.140:8183', // 🔧 Replace with process.env or override during deployment
     frontendConsoleEndpoint: '/frontend-console-log',
     frontendErrorEndpoint: '/frontend-error',
     frontendMetricsEndpoint: '/frontend-metrics',
@@ -84,9 +84,9 @@ export const metrics = {
     frontendConsoleUrl: '/frontend-console-log',
   },
   frontEndFullUrl: {
-    frontendConsoleUrl: 'https://192.168.0.140:8083/frontend-console-log',
-    frontendErrorUrl: 'https://192.168.0.140:8083/frontend-error',
-    frontendMetricsUrl: 'https://192.168.0.140:8083/frontend-metrics',
+    frontendConsoleUrl: 'https://192.168.0.140:8183/frontend-console-log',
+    frontendErrorUrl: 'https://192.168.0.140:8183/frontend-error',
+    frontendMetricsUrl: 'https://192.168.0.140:8183/frontend-metrics',
  
 
   }
